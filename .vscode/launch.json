@@ -1,0 +1,22 @@
+
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Agent (default)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--quarter", "Q4-2025", "--examples", "3", "--per-week", "4"],
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run Agent (full plan 5/week)",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--quarter", "Q4-2025", "--examples", "3", "--per-week", "5"],
+      "console": "integratedTerminal"
+    }
+  ]
+}

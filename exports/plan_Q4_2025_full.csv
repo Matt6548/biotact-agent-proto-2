@@ -1,0 +1,61 @@
+week,start,end,channel,topic,product,goal,format
+1,2025-09-29,2025-10-05,Instagram,Reels: 3 признака/лайфхак,IMMUNOCOMPLEX_KIDS,Осведомленность,Подкаст
+1,2025-09-29,2025-10-05,Site,Гайд/Чек-лист,BIFOLAK_ZINCUM_C_D3,Доверие,Статья
+1,2025-09-29,2025-10-05,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Осведомленность,Reels
+1,2025-09-29,2025-10-05,Partners,POS-видео/плакат + QR,OPHTALMOCOMPLEX,Продажи,Карусель
+1,2025-09-29,2025-10-05,Instagram,Reels: 3 признака/лайфхак,CALCIY_TRIACTIVE_D3,Осведомленность,Видео
+2,2025-10-06,2025-10-12,Site,Гайд/Чек-лист,BIFOLAK_ZINCUM_C_D3,Осведомленность,Видео
+2,2025-10-06,2025-10-12,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Продажи,Видео
+2,2025-10-06,2025-10-12,Email,Персонализированная рассылка + bundle,OPHTALMOCOMPLEX,Лояльность,Карусель
+2,2025-10-06,2025-10-12,Podcast,Inside Talk: мини-выпуск 10–12 мин,CALCIY_TRIACTIVE_D3,Продажи,Email
+2,2025-10-06,2025-10-12,Site,Гайд/Чек-лист,DERMACOMPLEX,Доверие,Видео
+3,2025-10-13,2025-10-19,Podcast,Inside Talk: мини-выпуск 10–12 мин,BIFOLAK_MAGNIY,Осведомленность,Reels
+3,2025-10-13,2025-10-19,Email,Персонализированная рассылка + bundle,OPHTALMOCOMPLEX,Осведомленность,Email
+3,2025-10-13,2025-10-19,Site,Гайд/Чек-лист,CALCIY_TRIACTIVE_D3,Лояльность,Карусель
+3,2025-10-13,2025-10-19,Email,Персонализированная рассылка + bundle,DERMACOMPLEX,Продажи,Reels
+3,2025-10-13,2025-10-19,Partners,POS-видео/плакат + QR,IMMUNOCOMPLEX,Осведомленность,Подкаст
+4,2025-10-20,2025-10-26,Partners,POS-видео/плакат + QR,OPHTALMOCOMPLEX,Лояльность,Видео
+4,2025-10-20,2025-10-26,Instagram,Reels: 3 признака/лайфхак,CALCIY_TRIACTIVE_D3,Осведомленность,Видео
+4,2025-10-20,2025-10-26,Site,Гайд/Чек-лист,DERMACOMPLEX,Осведомленность,Видео
+4,2025-10-20,2025-10-26,Instagram,Reels: 3 признака/лайфхак,IMMUNOCOMPLEX,Продажи,Подкаст
+4,2025-10-20,2025-10-26,AR,AR-фильтр/скан баночки,IMMUNOCOMPLEX_KIDS,Лояльность,Статья
+5,2025-10-27,2025-11-02,Site,Гайд/Чек-лист,CALCIY_TRIACTIVE_D3,Лояльность,Видео
+5,2025-10-27,2025-11-02,Email,Персонализированная рассылка + bundle,DERMACOMPLEX,Лояльность,Reels
+5,2025-10-27,2025-11-02,AR,AR-фильтр/скан баночки,IMMUNOCOMPLEX,Доверие,Видео
+5,2025-10-27,2025-11-02,YouTube,Biotact Inside: 5 минут простым языком,IMMUNOCOMPLEX_KIDS,Продажи,POS
+5,2025-10-27,2025-11-02,Email,Персонализированная рассылка + bundle,BIFOLAK_ZINCUM_C_D3,Доверие,Email
+6,2025-11-03,2025-11-09,Instagram,Reels: 3 признака/лайфхак,DERMACOMPLEX,Доверие,Карусель
+6,2025-11-03,2025-11-09,Email,Персонализированная рассылка + bundle,IMMUNOCOMPLEX,Продажи,Подкаст
+6,2025-11-03,2025-11-09,Instagram,Reels: 3 признака/лайфхак,IMMUNOCOMPLEX_KIDS,Доверие,Email
+6,2025-11-03,2025-11-09,Site,Гайд/Чек-лист,BIFOLAK_ZINCUM_C_D3,Продажи,POS
+6,2025-11-03,2025-11-09,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Продажи,Статья
+7,2025-11-10,2025-11-16,Email,Персонализированная рассылка + bundle,IMMUNOCOMPLEX,Доверие,Видео
+7,2025-11-10,2025-11-16,Email,Персонализированная рассылка + bundle,IMMUNOCOMPLEX_KIDS,Продажи,POS
+7,2025-11-10,2025-11-16,Email,Персонализированная рассылка + bundle,BIFOLAK_ZINCUM_C_D3,Доверие,Статья
+7,2025-11-10,2025-11-16,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Продажи,Reels
+7,2025-11-10,2025-11-16,YouTube,Biotact Inside: 5 минут простым языком,OPHTALMOCOMPLEX,Осведомленность,Статья
+8,2025-11-17,2025-11-23,YouTube,Biotact Inside: 5 минут простым языком,IMMUNOCOMPLEX_KIDS,Продажи,Reels
+8,2025-11-17,2025-11-23,Partners,POS-видео/плакат + QR,BIFOLAK_ZINCUM_C_D3,Продажи,AR
+8,2025-11-17,2025-11-23,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Лояльность,Карусель
+8,2025-11-17,2025-11-23,YouTube,Biotact Inside: 5 минут простым языком,OPHTALMOCOMPLEX,Лояльность,Email
+8,2025-11-17,2025-11-23,Instagram,Reels: 3 признака/лайфхак,CALCIY_TRIACTIVE_D3,Лояльность,POS
+9,2025-11-24,2025-11-30,Site,Гайд/Чек-лист,BIFOLAK_ZINCUM_C_D3,Продажи,Карусель
+9,2025-11-24,2025-11-30,Email,Персонализированная рассылка + bundle,BIFOLAK_MAGNIY,Лояльность,Статья
+9,2025-11-24,2025-11-30,Partners,POS-видео/плакат + QR,OPHTALMOCOMPLEX,Осведомленность,Подкаст
+9,2025-11-24,2025-11-30,Podcast,Inside Talk: мини-выпуск 10–12 мин,CALCIY_TRIACTIVE_D3,Доверие,Email
+9,2025-11-24,2025-11-30,Instagram,Reels: 3 признака/лайфхак,DERMACOMPLEX,Осведомленность,Email
+10,2025-12-01,2025-12-07,Podcast,Inside Talk: мини-выпуск 10–12 мин,BIFOLAK_MAGNIY,Осведомленность,Reels
+10,2025-12-01,2025-12-07,Site,Гайд/Чек-лист,OPHTALMOCOMPLEX,Лояльность,Видео
+10,2025-12-01,2025-12-07,Instagram,Reels: 3 признака/лайфхак,CALCIY_TRIACTIVE_D3,Доверие,Reels
+10,2025-12-01,2025-12-07,Instagram,Reels: 3 признака/лайфхак,DERMACOMPLEX,Продажи,Reels
+10,2025-12-01,2025-12-07,AR,AR-фильтр/скан баночки,IMMUNOCOMPLEX,Доверие,Статья
+11,2025-12-08,2025-12-14,Email,Персонализированная рассылка + bundle,OPHTALMOCOMPLEX,Доверие,Подкаст
+11,2025-12-08,2025-12-14,Email,Персонализированная рассылка + bundle,CALCIY_TRIACTIVE_D3,Доверие,Видео
+11,2025-12-08,2025-12-14,Email,Персонализированная рассылка + bundle,DERMACOMPLEX,Лояльность,POS
+11,2025-12-08,2025-12-14,Email,Персонализированная рассылка + bundle,IMMUNOCOMPLEX,Продажи,AR
+11,2025-12-08,2025-12-14,Instagram,Reels: 3 признака/лайфхак,IMMUNOCOMPLEX_KIDS,Доверие,Видео
+12,2025-12-15,2025-12-21,Instagram,Reels: 3 признака/лайфхак,CALCIY_TRIACTIVE_D3,Лояльность,Карусель
+12,2025-12-15,2025-12-21,Email,Персонализированная рассылка + bundle,DERMACOMPLEX,Доверие,Видео
+12,2025-12-15,2025-12-21,Instagram,Reels: 3 признака/лайфхак,IMMUNOCOMPLEX,Осведомленность,Карусель
+12,2025-12-15,2025-12-21,YouTube,Biotact Inside: 5 минут простым языком,IMMUNOCOMPLEX_KIDS,Осведомленность,Карусель
+12,2025-12-15,2025-12-21,Email,Персонализированная рассылка + bundle,BIFOLAK_ZINCUM_C_D3,Осведомленность,Видео

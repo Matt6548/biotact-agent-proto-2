@@ -1,0 +1,16 @@
+﻿backup_*/
+backup_*/
+backup_*/**
+__pycache__/
+*.pyc
+*.log
+control_server.pid
+
+# секреты и приватные файлы
+.env
+.env.local.json
+config/settings.json
+recipients.csv
+
+# временные публикации
+exports/logs/

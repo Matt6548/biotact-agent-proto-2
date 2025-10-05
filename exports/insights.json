@@ -1,0 +1,22 @@
+[
+  {
+    "sku": "IMMUNOCOMPLEX",
+    "insight": "Immunocomplex: фокус на иммунная защита, энергия; 'пиллары': бета-глюкан, витамин C, цинк."
+  },
+  {
+    "sku": "IMMUNOCOMPLEX_KIDS",
+    "insight": "Immunocomplex Kids: фокус на детский иммунитет, защита в школе/садике; 'пиллары': витамин C, цинк, D3."
+  },
+  {
+    "sku": "BIFOLAK_ZINCUM_C_D3",
+    "insight": "Bifolak Zincum + C + D3: фокус на дыхательные пути, иммунитет; 'пиллары': цинк, витамин C, витамин D3."
+  },
+  {
+    "sku": "CALCIY_TRIACTIVE_D3",
+    "insight": "Calciy Triactive D3: фокус на кости, зубы; 'пиллары': кальций цитрат, витамин D3, витамины группы B."
+  },
+  {
+    "sku": "DERMACOMPLEX",
+    "insight": "Dermacomplex: фокус на кожа, волосы; 'пиллары': кверцетин, бромелаин, биотин."
+  }
+]

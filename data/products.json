@@ -1,0 +1,211 @@
+[
+  {
+    "sku": "IMMUNOCOMPLEX",
+    "name": "Immunocomplex",
+    "audience": [
+      "семьи",
+      "взрослые",
+      "родители"
+    ],
+    "benefits": [
+      "иммунная защита",
+      "энергия",
+      "восстановление после простуд"
+    ],
+    "pillars": [
+      "бета-глюкан",
+      "витамин C",
+      "цинк",
+      "селен",
+      "пробиотики"
+    ],
+    "seasonality": [
+      "осень",
+      "зима"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "YouTube",
+      "Email",
+      "Partners",
+      "AR"
+    ]
+  },
+  {
+    "sku": "IMMUNOCOMPLEX_KIDS",
+    "name": "Immunocomplex Kids",
+    "audience": [
+      "дети",
+      "родители"
+    ],
+    "benefits": [
+      "детский иммунитет",
+      "защита в школе/садике"
+    ],
+    "pillars": [
+      "витамин C",
+      "цинк",
+      "D3",
+      "пробиотики"
+    ],
+    "seasonality": [
+      "осень",
+      "зима"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "YouTube",
+      "Email",
+      "AR"
+    ]
+  },
+  {
+    "sku": "BIFOLAK_ZINCUM_C_D3",
+    "name": "Bifolak Zincum + C + D3",
+    "audience": [
+      "взрослые",
+      "спорт",
+      "семьи"
+    ],
+    "benefits": [
+      "дыхательные пути",
+      "иммунитет",
+      "восстановление"
+    ],
+    "pillars": [
+      "цинк",
+      "витамин C",
+      "витамин D3",
+      "пробиотики"
+    ],
+    "seasonality": [
+      "осень",
+      "зима"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "Site",
+      "Email",
+      "Partners"
+    ]
+  },
+  {
+    "sku": "BIFOLAK_MAGNIY",
+    "name": "Bifolak Magniy",
+    "audience": [
+      "офис",
+      "студенты",
+      "женщины"
+    ],
+    "benefits": [
+      "стресс/сон",
+      "мышцы/сердце",
+      "ПМС"
+    ],
+    "pillars": [
+      "магний цитрат",
+      "витамины группы B",
+      "пробиотики"
+    ],
+    "seasonality": [
+      "круглый год"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "Podcast",
+      "Email"
+    ]
+  },
+  {
+    "sku": "OPHTALMOCOMPLEX",
+    "name": "Ophtalmocomplex",
+    "audience": [
+      "офис",
+      "студенты",
+      "родители"
+    ],
+    "benefits": [
+      "защита макулы",
+      "синий свет",
+      "контрастность"
+    ],
+    "pillars": [
+      "лютеин",
+      "зеаксантин",
+      "витамины A/E/C",
+      "рутин"
+    ],
+    "seasonality": [
+      "осень",
+      "круглый год"
+    ],
+    "channels_hint": [
+      "YouTube",
+      "Instagram",
+      "Site",
+      "Email",
+      "Partners"
+    ]
+  },
+  {
+    "sku": "CALCIY_TRIACTIVE_D3",
+    "name": "Calciy Triactive D3",
+    "audience": [
+      "50+",
+      "беременные",
+      "дети"
+    ],
+    "benefits": [
+      "кости",
+      "зубы",
+      "ногти"
+    ],
+    "pillars": [
+      "кальций цитрат",
+      "витамин D3",
+      "витамины группы B",
+      "пробиотики"
+    ],
+    "seasonality": [
+      "осень",
+      "зима",
+      "круглый год"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "Podcast",
+      "Site",
+      "Email"
+    ]
+  },
+  {
+    "sku": "DERMACOMPLEX",
+    "name": "Dermacomplex",
+    "audience": [
+      "женщины",
+      "beauty"
+    ],
+    "benefits": [
+      "кожа",
+      "волосы",
+      "ногти"
+    ],
+    "pillars": [
+      "кверцетин",
+      "бромелаин",
+      "биотин",
+      "цинк",
+      "селен",
+      "витамины A/E/C"
+    ],
+    "seasonality": [
+      "перед праздниками",
+      "зима"
+    ],
+    "channels_hint": [
+      "Instagram",
+      "Site",
+      "Email"
+    ]
+  }
+]

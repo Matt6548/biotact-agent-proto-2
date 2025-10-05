@@ -1,0 +1,65 @@
+[
+  {
+    "sku": "IMMUNOCOMPLEX",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья",
+        "профилактика"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "kpi": {
+      "ER_min_%": 4,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null
+    }
+  },
+  {
+    "sku": "IMMUNOCOMPLEX_KIDS",
+    "audience": {
+      "age": "25-45 (родители)",
+      "gender": "all",
+      "interests": [
+        "дети",
+        "школа",
+        "здоровье",
+        "семейные покупки"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 350,
+    "kpi": {
+      "ER_min_%": 4,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null
+    }
+  },
+  {
+    "sku": "BIFOLAK_ZINCUM_C_D3",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья",
+        "профилактика"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "kpi": {
+      "ER_min_%": 4,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null
+    }
+  }
+]

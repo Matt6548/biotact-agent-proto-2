@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="g1" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#F4F6F8"/>
+      <stop offset="100%" stop-color="#EAF3F3"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="1024" height="1024" fill="url(#g1)"/>
+  <!-- Силуэт банки -->
+  <rect x="372" y="240" width="280" height="420" rx="24" fill="#FFFFFF" stroke="#0AA3A3" stroke-width="6"/>
+  <rect x="392" y="260" width="240" height="90" rx="12" fill="#0AA3A3"/>
+  <text x="512" y="315" font-family="Segoe UI, Arial" font-size="26" text-anchor="middle" fill="#FFFFFF">Immunocomplex</text>
+  <text x="512" y="520" font-family="Segoe UI, Arial" font-size="34" text-anchor="middle" fill="#28303C">Autumn mood</text>
+
+  <!-- Заголовок -->
+  <text x="512" y="760" font-family="Segoe UI, Arial" font-size="40" text-anchor="middle" fill="#0A1830">Biotact — Visual Draft</text>
+  <!-- Подпись с кусочком промпта -->
+  <text x="512" y="810" font-family="Segoe UI, Arial" font-size="20" text-anchor="middle" fill="#28303C">Immunocomplex product jar on light background, soft shadows, minimal label, autumn mood</text>
+
+  <!-- Кнопка-CTA -->
+  <rect x="412" y="860" width="200" height="56" rx="28" fill="#0AA3A3"/>
+  <text x="512" y="896" font-family="Segoe UI, Arial" font-size="20" text-anchor="middle" fill="#FFFFFF">Подробнее</text>
+</svg>

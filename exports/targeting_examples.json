@@ -1,0 +1,218 @@
+[
+  {
+    "example_id": "_IG",
+    "sku": "",
+    "channel": "Instagram",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 5,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": 8
+    }
+  },
+  {
+    "example_id": "_EMAIL",
+    "sku": "",
+    "channel": "Email",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": 12,
+      "ig_to_youtube_views_%": null
+    }
+  },
+  {
+    "example_id": "_POD",
+    "sku": "",
+    "channel": "Podcast",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": 70,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": null
+    }
+  },
+  {
+    "example_id": "_IG",
+    "sku": "",
+    "channel": "Instagram",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 5,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": 8
+    }
+  },
+  {
+    "example_id": "_EMAIL",
+    "sku": "",
+    "channel": "Email",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": 12,
+      "ig_to_youtube_views_%": null
+    }
+  },
+  {
+    "example_id": "_POD",
+    "sku": "",
+    "channel": "Podcast",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": 70,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": null
+    }
+  },
+  {
+    "example_id": "_IG",
+    "sku": "",
+    "channel": "Instagram",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 5,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": 8
+    }
+  },
+  {
+    "example_id": "_EMAIL",
+    "sku": "",
+    "channel": "Email",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 2.0,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": null,
+      "site_sessions_from_email_%": 12,
+      "ig_to_youtube_views_%": null
+    }
+  },
+  {
+    "example_id": "_POD",
+    "sku": "",
+    "channel": "Podcast",
+    "audience": {
+      "age": "25-50",
+      "gender": "all",
+      "interests": [
+        "wellness",
+        "ЗОЖ",
+        "семья"
+      ],
+      "geo": "ЦА/СНГ"
+    },
+    "budget_eur": 300,
+    "metrics": {
+      "ER_min_%": 3,
+      "CTR_min_%": 0.8,
+      "Conv_min_%": 1.0,
+      "Podcast_watch_%": 70,
+      "site_sessions_from_email_%": null,
+      "ig_to_youtube_views_%": null
+    }
+  }
+]

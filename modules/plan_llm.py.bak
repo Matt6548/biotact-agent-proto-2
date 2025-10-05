@@ -1,0 +1,53 @@
+﻿import os, json, requests
+from typing import List, Dict
+
+def _fallback_rationale(week_id, brief, quarter):
+    return (
+        f"еделя {week_id} ({quarter}): контент сфокусирован на сезонности Q4 — поддержка иммунитета/энергии и подготовка к праздникам. "
+        f"осты и материалы связаны между собой: соцсети подогревают интерес и ведут на сайт (статьи/FAQ), email закрепляет предложение, "
+        f"подкаст Biotact Inside добавляет экспертности, а партнёрские площадки усиливают достоверность. Темы недели:\n{brief}\n"
+        "Тон осторожный и корректный («поддерживает», «способствует»). KPI: ER/CTR, дочитывания/прослушивания и переходы на сайт."
+    )
+
+def add_week_rationales(rows: List[Dict], quarter="Q4-2025") -> List[Dict]:
+    by_week = {}
+    for r in rows:
+        by_week.setdefault(r["week"], []).append(r)
+
+    rationales = {}
+    for w, items in by_week.items():
+        brief = []
+        for it in items[:6]:
+            brief.append(f"- {it['channel']}: {it['topic']} ({it['product']} → {it['goal']}/{it['format']})")
+        text = "\n".join(brief)
+        rationale = _llm_week(w, text, quarter)
+        rationales[w] = rationale
+
+    out = []
+    for r in rows:
+        r2 = dict(r)
+        r2["rationale"] = rationales.get(r["week"], "")
+        out.append(r2)
+    return out
+
+def _llm_week(week_id, brief, quarter):
+    api_key = os.getenv("OPENAI_API_KEY")
+    model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    base_url = os.getenv("OPENAI_BASE_URL","https://api.openai.com/v1/chat/completions")
+    timeout = int(os.getenv("OPENAI_TIMEOUT","30"))
+    if not api_key:
+        return _fallback_rationale(week_id, brief, quarter)
+    payload = {
+        "model": model,
+        "temperature": float(os.getenv("OPENAI_TEMPERATURE","0.7")),
+        "messages":[
+            {"role":"system","content":"Ты маркетолог-стратег. иши кратко, безопасно, без медицинских обещаний."},
+            {"role":"user","content": f"еделя {week_id}, {quarter}. ктивности:\n{brief}\n\nСформулируй 3–5 предложений обоснования: почему это логично для Q4 (иммунитет, энергия, праздники, wellness) и как это связано с Biotact Inside/Talk/Pulse/Partners."}
+        ]
+    }
+    try:
+        r = requests.post(base_url, headers={"Authorization":f"Bearer {api_key}","Content-Type":"application/json"}, json=payload, timeout=timeout)
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        return _fallback_rationale(week_id, brief, quarter) + f"\n[LLM ERROR] {e}"
