@@ -14,3 +14,8 @@ recipients.csv
 
 # временные публикации
 exports/logs/
+
+# secrets (local)
+.env
+config/settings.json
+recipients.csv
