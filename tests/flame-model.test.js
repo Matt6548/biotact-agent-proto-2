@@ -1,0 +1,5 @@
+import test from "node:test";import assert from "node:assert/strict";import{FlameModel}from"../src/core/flame-model.js";
+test("distance attenuates effective stress",()=>{const near=new FlameModel().applyAirImpulse({impulse:1,alignment:1,distance:.1});const far=new FlameModel().applyAirImpulse({impulse:1,alignment:1,distance:.8});assert.ok(near.effectiveStress>far.effectiveStress)});
+test("poor alignment attenuates effective stress",()=>{const a=new FlameModel().applyAirImpulse({impulse:1,alignment:1,distance:.2});const b=new FlameModel().applyAirImpulse({impulse:1,alignment:.4,distance:.2});assert.ok(a.effectiveStress>b.effectiveStress)});
+test("sufficient stress extinguishes",()=>{const f=new FlameModel({extinctionThreshold:.6});assert.equal(f.applyAirImpulse({impulse:2,alignment:1,distance:.1}).extinguished,true)});
+test("reset restores stable flame",()=>{const f=new FlameModel({extinctionThreshold:.2});f.applyAirImpulse({impulse:2,alignment:1,distance:0});f.reset();assert.deepEqual(f.snapshot(),{tilt:0,instability:0,stability:1,extinguished:false})});

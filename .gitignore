@@ -1,21 +1,7 @@
-﻿backup_*/
-backup_*/
-backup_*/**
-__pycache__/
-*.pyc
+node_modules/
+dist/
+playwright-report/
+test-results/
+.DS_Store
+.env
 *.log
-control_server.pid
-
-# секреты и приватные файлы
-.env
-.env.local.json
-config/settings.json
-recipients.csv
-
-# временные публикации
-exports/logs/
-
-# secrets (local)
-.env
-config/settings.json
-recipients.csv
