@@ -50,6 +50,8 @@ export class CandleRenderer{
     this.state={tilt:0,instability:0,stability:1,extinguished:false};
     this.wasExtinguished=false;
     this.smokeLife=0;
+    this.airPulseLife=0;
+    this.airPulseStrength=0;
 
     this.scene=new THREE.Scene();
     this.camera=new THREE.PerspectiveCamera(28,1,.1,100);
@@ -115,9 +117,7 @@ export class CandleRenderer{
     );
     this.wick.position.y=1.27;this.scene.add(this.wick);
 
-    this.flameUniforms={
-      uTime:{value:0},uTilt:{value:0},uInstability:{value:0},uAlive:{value:1}
-    };
+    this.flameUniforms={uTime:{value:0},uTilt:{value:0},uInstability:{value:0},uAlive:{value:1}};
     const flameMaterial=new THREE.ShaderMaterial({
       vertexShader:FLAME_VERTEX,fragmentShader:FLAME_FRAGMENT,
       uniforms:this.flameUniforms,transparent:true,depthWrite:false,
@@ -131,19 +131,33 @@ export class CandleRenderer{
     this.flameLight.position.set(0,1.8,.1);this.scene.add(this.flameLight);
 
     const smokeCount=34;
-    const positions=new Float32Array(smokeCount*3);
+    const smokePositions=new Float32Array(smokeCount*3);
     this.smokeSeeds=[];
     for(let i=0;i<smokeCount;i++){
-      positions[i*3]=0;positions[i*3+1]=1.55;positions[i*3+2]=0;
+      smokePositions[i*3]=0;smokePositions[i*3+1]=1.55;smokePositions[i*3+2]=0;
       this.smokeSeeds.push({phase:i*.73,speed:.65+(i%7)*.055,spread:.08+(i%5)*.018});
     }
     this.smokeGeometry=new THREE.BufferGeometry();
-    this.smokeGeometry.setAttribute("position",new THREE.BufferAttribute(positions,3));
-    this.smokeMaterial=new THREE.PointsMaterial({
-      color:0xb6b6ad,size:.075,transparent:true,opacity:0,depthWrite:false,sizeAttenuation:true
-    });
+    this.smokeGeometry.setAttribute("position",new THREE.BufferAttribute(smokePositions,3));
+    this.smokeMaterial=new THREE.PointsMaterial({color:0xb6b6ad,size:.075,transparent:true,opacity:0,depthWrite:false,sizeAttenuation:true});
     this.smoke=new THREE.Points(this.smokeGeometry,this.smokeMaterial);
     this.scene.add(this.smoke);
+
+    const airCount=54;
+    const airPositions=new Float32Array(airCount*3);
+    this.airSeeds=[];
+    for(let i=0;i<airCount;i++){
+      airPositions[i*3]=-3;airPositions[i*3+1]=1.72;airPositions[i*3+2]=0;
+      this.airSeeds.push({phase:i*.91,offset:(i/airCount)*.85,vertical:((i%9)-4)*.025,depth:((i%7)-3)*.025});
+    }
+    this.airGeometry=new THREE.BufferGeometry();
+    this.airGeometry.setAttribute("position",new THREE.BufferAttribute(airPositions,3));
+    this.airMaterial=new THREE.PointsMaterial({
+      color:0xdde5df,size:.052,transparent:true,opacity:0,depthWrite:false,sizeAttenuation:true,
+      blending:THREE.AdditiveBlending
+    });
+    this.airPulse=new THREE.Points(this.airGeometry,this.airMaterial);
+    this.scene.add(this.airPulse);
   }
 
   setState(next){
@@ -154,27 +168,48 @@ export class CandleRenderer{
     if(justExtinguished)this.smokeLife=1;
   }
 
+  triggerImpulse(strength=.5){
+    this.airPulseStrength=THREE.MathUtils.clamp(Number(strength)||0,.15,1.35);
+    this.airPulseLife=1;
+  }
+
   reset(){
     this.state={tilt:0,instability:0,stability:1,extinguished:false};
-    this.wasExtinguished=false;this.smokeLife=0;
+    this.wasExtinguished=false;this.smokeLife=0;this.airPulseLife=0;
+    if(this.airMaterial)this.airMaterial.opacity=0;
   }
 
   updateSmoke(dt,elapsed){
-    if(this.smokeLife<=0){
-      this.smokeMaterial.opacity=0;return;
-    }
+    if(this.smokeLife<=0){this.smokeMaterial.opacity=0;return;}
     this.smokeLife=Math.max(0,this.smokeLife-dt*.24);
     const progress=1-this.smokeLife;
     const arr=this.smokeGeometry.attributes.position.array;
     for(let i=0;i<this.smokeSeeds.length;i++){
-      const s=this.smokeSeeds[i];
-      const local=(progress*1.8+i/this.smokeSeeds.length*.55)%1;
+      const s=this.smokeSeeds[i],local=(progress*1.8+i/this.smokeSeeds.length*.55)%1;
       arr[i*3]=Math.sin(elapsed*1.1+s.phase)*s.spread*(.35+local);
       arr[i*3+1]=1.55+local*(.65+s.speed);
       arr[i*3+2]=Math.cos(elapsed*.9+s.phase)*s.spread*.55;
     }
     this.smokeGeometry.attributes.position.needsUpdate=true;
     this.smokeMaterial.opacity=Math.sin(Math.min(1,progress*3)*Math.PI*.5)*this.smokeLife*.44;
+  }
+
+  updateAirPulse(dt,elapsed){
+    if(this.airPulseLife<=0){this.airMaterial.opacity=0;return;}
+    this.airPulseLife=Math.max(0,this.airPulseLife-dt*1.75);
+    const progress=1-this.airPulseLife;
+    const arr=this.airGeometry.attributes.position.array;
+    const packetX=-2.7+progress*3.05;
+    for(let i=0;i<this.airSeeds.length;i++){
+      const s=this.airSeeds[i];
+      const tail=s.offset*(.7+.22*this.airPulseStrength);
+      arr[i*3]=packetX-tail;
+      arr[i*3+1]=1.72+s.vertical+Math.sin(elapsed*12+s.phase)*.035*this.airPulseStrength;
+      arr[i*3+2]=s.depth+Math.cos(elapsed*9+s.phase)*.025*this.airPulseStrength;
+    }
+    this.airGeometry.attributes.position.needsUpdate=true;
+    this.airMaterial.opacity=Math.sin(Math.PI*progress)*.32*Math.min(1,this.airPulseStrength);
+    this.airMaterial.size=.045+.02*Math.min(1,this.airPulseStrength);
   }
 
   resize(){
@@ -202,6 +237,7 @@ export class CandleRenderer{
     this.flameLight.intensity=this.state.extinguished?Math.max(0,2.2*(1-alive)):2.35*flicker;
     this.flameLight.position.x=Math.sin(elapsed*7.1)*.025*(1+(this.state.instability||0));
 
+    this.updateAirPulse(dt,elapsed);
     this.updateSmoke(dt,elapsed);
     this.renderer.render(this.scene,this.camera);
   }

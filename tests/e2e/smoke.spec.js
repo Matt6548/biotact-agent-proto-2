@@ -1,13 +1,13 @@
 import { test, expect } from "@playwright/test";
 
-test("focused arena completes a full simulated five-strike round",async({page},testInfo)=>{
+test("focused arena completes one fixed-goal five-strike round",async({page},testInfo)=>{
   await page.goto("/");
   await expect(page.getByRole("heading",{name:"Candle Strike"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
+  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
 
   const target=page.locator("#target-canvas canvas");
   await expect(target).toBeVisible();
-
   const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 
@@ -15,21 +15,20 @@ test("focused arena completes a full simulated five-strike round",async({page},t
 
   await page.getByText("Engineering simulation controls").click();
   await page.getByRole("button",{name:"Start simulated round"}).click();
+  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
 
   for(let i=0;i<5;i+=1){
     await page.getByRole("button",{name:"Simulate strike"}).click();
+    if(i<4)await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
     await page.waitForTimeout(80);
   }
 
   await expect(page.locator("#round-summary")).toBeVisible();
   await expect(page.locator("#round-count")).toHaveText("5 / 5");
   await expect(page.locator("#summary-score")).not.toHaveText("—");
+  await expect(page.locator("#arena-goal")).toHaveText("Make the flame unstable");
 
   await page.screenshot({path:testInfo.outputPath("02-round-complete.png"),fullPage:true});
-
-  await page.getByRole("button",{name:"Reset target"}).click();
-  await expect(page.locator("#score")).toHaveText("—");
-  await expect(page.locator("#flame-state")).toHaveText("Stable flame");
 });
 
 test("mobile focused arena has one primary action and no horizontal overflow",async({page},testInfo)=>{

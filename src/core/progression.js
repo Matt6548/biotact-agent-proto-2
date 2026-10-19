@@ -6,24 +6,36 @@ export const TRAINING_LEVELS=[
 ];
 
 export class TrainingProgression{
-  constructor({level=1,requiredStreak=3}={}){
-    this.requiredStreak=requiredStreak;
+  constructor({level=1,requiredSuccesses=3}={}){
+    this.requiredSuccesses=requiredSuccesses;
     this.levelIndex=Math.max(0,Math.min(TRAINING_LEVELS.length-1,level-1));
-    this.streak=0;
   }
 
   current(){return TRAINING_LEVELS[this.levelIndex];}
 
-  record(result){
-    const level=this.current();
-    const success=Boolean(level.success(result));
-    this.streak=success?this.streak+1:0;
-    let levelUp=false;
-    if(this.streak>=this.requiredStreak&&this.levelIndex<TRAINING_LEVELS.length-1){
-      this.levelIndex+=1;this.streak=0;levelUp=true;
-    }
-    return{success,levelUp,streak:this.streak,level:this.current()};
+  evaluate(result,level=this.current()){
+    return Boolean(level.success(result));
   }
 
-  reset(){this.levelIndex=0;this.streak=0;}
+  completeRound({successes=0}={}){
+    const completedLevel=this.current();
+    const passed=successes>=this.requiredSuccesses;
+    let levelUp=false;
+
+    if(passed&&this.levelIndex<TRAINING_LEVELS.length-1){
+      this.levelIndex+=1;
+      levelUp=true;
+    }
+
+    return{
+      passed,
+      levelUp,
+      successes,
+      requiredSuccesses:this.requiredSuccesses,
+      completedLevel,
+      level:this.current(),
+    };
+  }
+
+  reset(){this.levelIndex=0;}
 }
