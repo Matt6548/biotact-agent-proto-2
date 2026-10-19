@@ -12,6 +12,7 @@ export class PoseTracker {
     this.frameTimes = [];
     this.busySkipTimes = [];
     this.delegate = null;
+    this.modelReady = false;
   }
 
   async start() {
@@ -55,6 +56,7 @@ export class PoseTracker {
     this.frameTimes = [];
     this.busySkipTimes = [];
     this.delegate = null;
+    this.modelReady = false;
     this.onStatus?.({ state: "idle", message: "Camera stopped" });
   }
 
@@ -65,6 +67,7 @@ export class PoseTracker {
   handleWorkerMessage(data) {
     if (data.type === "ready") {
       this.delegate = data.delegate || "unknown";
+      this.modelReady = true;
       this.onStatus?.({
         state: "ready",
         message: `Pose model ready · ${this.delegate}`,
@@ -99,6 +102,7 @@ export class PoseTracker {
 
     if (data.type === "detect-error" || data.type === "error") {
       this.frameBusy = false;
+      if (data.type === "error") this.modelReady = false;
       this.onStatus?.({ state: "error", message: data.error });
     }
   }
@@ -112,7 +116,7 @@ export class PoseTracker {
       const videoReady = this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
       const due = now - this.lastSentAt >= this.minFrameIntervalMs;
 
-      if (this.worker && videoReady && due) {
+      if (this.worker && this.modelReady && videoReady && due) {
         if (this.frameBusy) {
           this.busySkipTimes.push(now);
           this.pruneWindow(this.busySkipTimes, now);
