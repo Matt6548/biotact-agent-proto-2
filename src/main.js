@@ -234,7 +234,7 @@ function setCameraStatus({state,message}){
   cameraStatus.textContent=message;
   if(state==="ready"){
     poseReady=true;
-    if(cameraStarted&&!calibrating)setupState.textContent="Motion model ready · calibrate next";
+    if(cameraStarted&&!calibrating)setupState.textContent="Motion model ready · step into frame";
     updatePrimary();
   }else if(state==="privacy-block"){
     setupState.textContent="External SDK request blocked · training data remains local";
@@ -361,7 +361,7 @@ async function startCameraFlow(){
     analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
     cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
     syncRendererMode();
-    setupState.textContent=poseReady?"Motion model ready · calibrate next":"Camera ready · loading motion model…";
+    setupState.textContent=poseReady?"Motion model ready · step into frame":"Camera ready · loading motion model…";
   }catch(error){setCameraStatus({state:"error",message:error?.message||"Camera failed"});setupState.textContent="Camera permission or device unavailable";cameraStarted=false;}
   updatePrimary();
 }
