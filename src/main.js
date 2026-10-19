@@ -82,7 +82,7 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
-let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
+let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
 function levelGoal(level){return level.id===1?"Deflect the flame":level.id===2?"Make the flame unstable":level.id===3?"Extinguish the flame":"Extinguish from longer virtual range";}
@@ -110,6 +110,7 @@ function updatePrimary(){
   if(round.active){primaryAction.textContent=`Round active · ${round.snapshot().attempts}/${round.attemptLimit}`;primaryAction.disabled=true;return;}
   primaryAction.disabled=false;
   if(!cameraStarted)primaryAction.textContent="Start training";
+  else if(!poseReady){primaryAction.textContent="Loading motion model…";primaryAction.disabled=true;}
   else if(!calibrated)primaryAction.textContent="Calibrate 5 s";
   else if(round.complete&&lastRoundOutcome?.levelUp)primaryAction.textContent=`Start next level · ${lastRoundOutcome.level.name}`;
   else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
@@ -165,7 +166,23 @@ function drawPose(landmarks){
   for(const[a,b]of CONNECTIONS){const pa=landmarks[a],pb=landmarks[b];if(!pa||!pb||(pa.visibility??0)<.5||(pb.visibility??0)<.5)continue;ctx.beginPath();ctx.moveTo(pa.x*overlay.width,pa.y*overlay.height);ctx.lineTo(pb.x*overlay.width,pb.y*overlay.height);ctx.stroke();}
   for(const index of[11,12,13,14,15,16,23,24]){const p=landmarks[index];if(!p||(p.visibility??0)<.5)continue;ctx.beginPath();ctx.arc(p.x*overlay.width,p.y*overlay.height,Math.max(4,overlay.width/180),0,Math.PI*2);ctx.fill();}
 }
-function setCameraStatus({state,message}){cameraStatus.dataset.state=state;cameraStatus.textContent=message;}
+function setCameraStatus({state,message}){
+  cameraStatus.dataset.state=state;
+  cameraStatus.textContent=message;
+  if(state==="ready"){
+    poseReady=true;
+    if(cameraStarted&&!calibrating)setupState.textContent="Motion model ready · calibrate next";
+    updatePrimary();
+  }else if(state==="error"){
+    poseReady=false;
+    if(cameraStarted)setupState.textContent="Motion model failed · stop camera and retry";
+    updatePrimary();
+  }else if(state==="starting"){
+    poseReady=false;
+    setupState.textContent="Starting camera…";
+    updatePrimary();
+  }
+}
 
 function processStrike(strike,{recordHistory=true,haptic=true}={}){
   clearTimeout(relightTimer);resetCandleOnly();
@@ -212,13 +229,14 @@ function updateLive(result){
 async function startCameraFlow(){
   primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
   try{
-    analyzer.reset();tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
-    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;setupState.textContent="Camera ready · calibrate next";
+    analyzer.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
+    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    setupState.textContent=poseReady?"Motion model ready · calibrate next":"Camera ready · loading motion model…";
   }catch(error){setCameraStatus({state:"error",message:error?.message||"Camera failed"});setupState.textContent="Camera permission or device unavailable";cameraStarted=false;}
   updatePrimary();
 }
 function runCalibration(){
-  if(!tracker||calibrationTimer||calibrating)return;
+  if(!tracker||!poseReady||calibrationTimer||calibrating)return;
   analyzer.startCalibration();calibrating=true;setupState.textContent="Move now · 5 s";updatePrimary();
   let remaining=5;
   const tick=setInterval(()=>{remaining-=1;if(remaining>0)setupState.textContent=`Move now · ${remaining} s`;},1000);
@@ -238,7 +256,7 @@ function startRound({simulation=false}={}){
 primaryAction.addEventListener("click",()=>{if(!cameraStarted){startCameraFlow();return;}if(!calibrated){runCalibration();return;}if(!round.active)startRound();});
 stopCamera.addEventListener("click",()=>{
   if(calibrationTimer){clearTimeout(calibrationTimer);calibrationTimer=null;}
-  calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;calibrated=false;cameraCard.dataset.camera="off";ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
+  calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
   if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
   updateRound();
