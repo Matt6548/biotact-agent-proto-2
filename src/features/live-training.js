@@ -1,0 +1,64 @@
+import { averageVisibility, inFrameRatio, qualityGate, velocityBetween } from "../core/motion-model.js";
+import { StrikeDetector } from "../core/strike-detector.js";
+
+const KEY = {
+  leftShoulder: 11,
+  rightShoulder: 12,
+  leftElbow: 13,
+  rightElbow: 14,
+  leftWrist: 15,
+  rightWrist: 16,
+  leftHip: 23,
+  rightHip: 24,
+};
+
+const ESSENTIAL = Object.values(KEY);
+
+export class LiveTrainingAnalyzer {
+  constructor() {
+    this.detectors = { left: new StrikeDetector(), right: new StrikeDetector() };
+    this.previous = { left: null, right: null };
+  }
+
+  reset() {
+    this.detectors.left.reset();
+    this.detectors.right.reset();
+    this.previous = { left: null, right: null };
+  }
+
+  analyze({ landmarks, worldLandmarks, timestampMs, fps }) {
+    if (!landmarks || !worldLandmarks) {
+      return { quality: { ok: false, reasons: ["no-pose"] }, metrics: null, strike: null };
+    }
+
+    const visibility = averageVisibility(landmarks, ESSENTIAL);
+    const bodyCoverage = inFrameRatio(landmarks, ESSENTIAL);
+    const quality = qualityGate({ visibility, fps, bodyCoverage });
+
+    const leftPoint = { ...worldLandmarks[KEY.leftWrist], t: timestampMs };
+    const rightPoint = { ...worldLandmarks[KEY.rightWrist], t: timestampMs };
+    const leftSpeed = velocityBetween(this.previous.left, leftPoint);
+    const rightSpeed = velocityBetween(this.previous.right, rightPoint);
+
+    const leftStrike = this.detectors.left.update({ t: timestampMs, speed: leftSpeed, point: leftPoint });
+    const rightStrike = this.detectors.right.update({ t: timestampMs, speed: rightSpeed, point: rightPoint });
+
+    this.previous.left = leftPoint;
+    this.previous.right = rightPoint;
+
+    const strike = !quality.ok
+      ? null
+      : [
+          leftStrike && { ...leftStrike, hand: "left" },
+          rightStrike && { ...rightStrike, hand: "right" },
+        ]
+          .filter(Boolean)
+          .sort((a, b) => b.peakSpeed - a.peakSpeed)[0] ?? null;
+
+    return {
+      quality,
+      metrics: { visibility, bodyCoverage, fps, leftWristSpeed: leftSpeed, rightWristSpeed: rightSpeed },
+      strike,
+    };
+  }
+}

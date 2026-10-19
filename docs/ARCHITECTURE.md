@@ -4,15 +4,19 @@
 Camera / Simulation Input
         |
         v
+Pose Worker (MediaPipe)
+        |
+        v
 Quality Gate
-(visibility, fps, framing)
+(visibility, processed fps, framing)
         |
         v
 Motion Extractor
-(speed, trajectory, timing, alignment)
+(wrist speed + trajectory)
         |
         v
-Strike Event Model
+Strike Detector
+(acceleration -> peak -> release)
         |
         +------------------+
         |                  |
@@ -33,18 +37,31 @@ Flame Response Core    Technique Metrics
 ```
 
 ## Boundaries
-- `src/core/`: pure deterministic logic; no camera, Three.js or AI dependency.
-- `src/vision/`: MediaPipe + frame processing.
-- `src/render/`: Three.js candle and training visuals.
-- `src/features/`: training-session composition.
-- Any later AI coach may explain deterministic metrics but may not fabricate measurements.
+- `src/core/`: pure deterministic logic.
+- `src/vision/`: MediaPipe worker + camera transport.
+- `src/features/`: training-session analysis/composition.
+- `src/render/`: reserved for Three.js Stage 3 renderer.
+- A future AI coach may explain deterministic metrics but may not fabricate measurements.
 
-## Performance
-MediaPipe video inference can block the main thread. Stage 1 should move inference off the rendering path where browser support permits it and allow frame skipping under load.
+## Stage 1 choices
+- Pose Landmarker Lite is used first for device reach.
+- Pose inference is off the main thread.
+- GPU is attempted first; worker falls back to CPU.
+- The transport never sends camera frames to an application server.
+- First trusted metrics are wrist speed trend, strike timing and trajectory straightness.
+- The virtual candle distance used for a live strike is a simulation parameter, not camera-measured physical distance.
+
+## Known Stage 1 limits
+- Model/WASM assets are downloaded from pinned external URLs on first use.
+- Single-camera world landmarks are estimates and require field validation.
+- No impact-force claim.
+- No real candle airflow calibration yet.
+- Fast motion may need device-specific thresholds.
 
 ## Validation ladder
-1. Unit tests for attenuation, extinction and scoring.
-2. Recorded motion fixtures for strike detection.
-3. Browser tests for complete training flow.
-4. Device performance checks.
-5. Real candle/video calibration before stronger physical-realism claims.
+1. Pure unit tests.
+2. Recorded motion fixtures.
+3. Browser camera tests.
+4. Desktop/mobile performance.
+5. Real-video/manual labeling comparison.
+6. Candle airflow calibration.
