@@ -17,13 +17,14 @@ export class TrainingRound{
     return this.snapshot();
   }
 
-  record({score=0,success=false,peakSpeed=0,straightness=0}={}){
+  record({score=0,success=false,peakSpeed=0,straightness=0,intensityRatio=0}={}){
     if(!this.active||this.complete)return this.snapshot();
     this.attempts.push({
       score:Number.isFinite(score)?score:0,
       success:Boolean(success),
       peakSpeed:Number.isFinite(peakSpeed)?peakSpeed:0,
       straightness:Number.isFinite(straightness)?straightness:0,
+      intensityRatio:Number.isFinite(intensityRatio)?intensityRatio:0,
     });
     if(this.attempts.length>=this.attemptLimit){
       this.complete=true;
@@ -34,7 +35,7 @@ export class TrainingRound{
 
   summary(){
     if(!this.attempts.length){
-      return{attempts:0,successes:0,bestScore:0,averageScore:0,bestSpeed:0,bestStraightness:0};
+      return{attempts:0,successes:0,bestScore:0,averageScore:0,bestSpeed:0,bestStraightness:0,bestIntensityRatio:0};
     }
     const attempts=this.attempts.length;
     const successes=this.attempts.filter((a)=>a.success).length;
@@ -42,7 +43,8 @@ export class TrainingRound{
     const averageScore=Math.round(this.attempts.reduce((sum,a)=>sum+a.score,0)/attempts);
     const bestSpeed=Math.max(...this.attempts.map((a)=>a.peakSpeed));
     const bestStraightness=Math.max(...this.attempts.map((a)=>a.straightness));
-    return{attempts,successes,bestScore,averageScore,bestSpeed,bestStraightness};
+    const bestIntensityRatio=Math.max(...this.attempts.map((a)=>a.intensityRatio||0));
+    return{attempts,successes,bestScore,averageScore,bestSpeed,bestStraightness,bestIntensityRatio};
   }
 
   snapshot(){

@@ -3,6 +3,7 @@ import { buildCoachFeedback } from "./core/coach.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
+import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
@@ -43,7 +44,7 @@ root.innerHTML=`
         <div class="camera-empty" id="camera-empty"><strong>Start training when you are ready</strong><span>Then stand 1.5–2.5 m away with shoulders, elbows, wrists and hips visible.</span></div>
       </div>
       <div class="setup-line"><div><span>Setup</span><strong id="setup-state">Camera not started</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Stop camera</button></div>
-      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Left wrist</span><strong id="left-speed">—</strong></div><div><span>Right wrist</span><strong id="right-speed">—</strong></div></div></details>
+      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div></details>
       <p class="camera-note">Use comfortable straight punches for calibration, not maximum effort. Keep real open flames away from the training area.</p>
     </article>
 
@@ -61,7 +62,7 @@ root.innerHTML=`
   <section class="round-summary" id="round-summary" hidden>
     <div><span>Round complete</span><strong id="summary-score">—</strong><small>average score</small></div>
     <div><span>Target hits</span><strong id="summary-success">—</strong><small>needed 3 of 5</small></div>
-    <div><span>Best registered speed</span><strong id="summary-speed">—</strong><small>camera estimate</small></div>
+    <div><span>Best intensity</span><strong id="summary-speed">—</strong><small>normalized reference</small></div>
     <div><span>Best line</span><strong id="summary-line">—</strong><small>trajectory straightness</small></div>
   </section>
 
@@ -143,7 +144,15 @@ const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,2
 function levelGoal(level){return level.id===1?"Deflect the flame":level.id===2?"Make the flame unstable":level.id===3?"Extinguish the flame":"Extinguish from longer virtual range";}
 function readHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]").slice(0,8);}catch{return[];}}
 function writeHistory(){localStorage.setItem(HISTORY_KEY,JSON.stringify(attempts.slice(0,8)));}
-function renderHistory(){historyCount.textContent=String(attempts.length);historyEl.innerHTML=attempts.length?attempts.map((a)=>`<li><span>${a.hand}</span><strong>${a.speed.toFixed(1)} m/s</strong><span>${a.straightness}% straight</span><b>${a.score}</b></li>`).join(""):`<li class="empty-history">No recorded attempts yet.</li>`;}
+function renderHistory(){
+  historyCount.textContent=String(attempts.length);
+  historyEl.innerHTML=attempts.length
+    ?attempts.map((a)=>{
+        const intensity=Number.isFinite(a.intensityRatio)?`${a.intensityRatio.toFixed(2)}× ref`:`${a.speed.toFixed(1)} m/s`;
+        return `<li><span>${a.hand}</span><strong>${intensity}</strong><span>${a.straightness}% straight</span><b>${a.score}</b></li>`;
+      }).join("")
+    :`<li class="empty-history">No recorded attempts yet.</li>`;
+}
 function displayedLevel(){
   if(round.complete&&lastRoundOutcome?.completedLevel)return lastRoundOutcome.completedLevel;
   if(round.active&&roundLevel)return roundLevel;
@@ -179,15 +188,23 @@ function updateRound(snapshot=round.snapshot()){
     roundSummary.hidden=false;
     root.querySelector("#summary-score").textContent=String(snapshot.averageScore);
     root.querySelector("#summary-success").textContent=`${snapshot.successes}/${snapshot.attemptLimit}`;
-    root.querySelector("#summary-speed").textContent=`${snapshot.bestSpeed.toFixed(1)} m/s`;
+    root.querySelector("#summary-speed").textContent=snapshot.bestIntensityRatio>0?`${snapshot.bestIntensityRatio.toFixed(2)}×`:"—";
     root.querySelector("#summary-line").textContent=`${Math.round(snapshot.bestStraightness*100)}%`;
   }
   updateLevel();updatePrimary();
 }
 renderHistory();updateLevel();updateRound();updatePrimary();
 
-function saveAttempt(strike,result,level){
-  attempts.unshift({hand:strike.hand==="left"?"L":"R",speed:strike.peakSpeed,straightness:Math.round(strike.straightness*100),score:result.score.score,level:level.id,at:Date.now()});
+function saveAttempt(strike,result,level,intensity){
+  attempts.unshift({
+    hand:strike.hand==="left"?"L":"R",
+    speed:strike.peakSpeed,
+    intensityRatio:intensity.ratio,
+    straightness:Math.round(strike.straightness*100),
+    score:result.score.score,
+    level:level.id,
+    at:Date.now()
+  });
   attempts=attempts.slice(0,8);writeHistory();renderHistory();
 }
 function showCoach(strike,result){
@@ -252,15 +269,22 @@ function setCameraStatus({state,message}){
 function processStrike(strike,{recordHistory=true,haptic=true}={}){
   clearTimeout(relightTimer);resetCandleOnly();
   const level=round.active&&roundLevel?roundLevel:progression.current();
-  const result=session.strike({speed:Math.min(12,strike.peakSpeed*2.5),alignment:strike.straightness,distance:level.distance});
+  const intensity=normalizeStrikeIntensity(strike.peakSpeed,analyzer.profile);
+  const result=session.strike({speed:intensity.trainingSpeed,alignment:strike.straightness,distance:level.distance});
   const hand=strike.hand==="left"?"L":"R";
-  renderFlame(result,`${hand} · ${strike.peakSpeed.toFixed(1)} m/s · ${Math.round(strike.straightness*100)}% straight`);
-  if(recordHistory)saveAttempt(strike,result,level);
+  renderFlame(result,`${hand} · ${intensity.ratio.toFixed(2)}× ref · ${Math.round(strike.straightness*100)}% straight`);
+  if(recordHistory)saveAttempt(strike,result,level,intensity);
   if(haptic)hapticFor(result);
 
   if(round.active){
     const success=progression.evaluate(result,roundLevel);
-    const roundState=round.record({score:result.score.score,success,peakSpeed:strike.peakSpeed,straightness:strike.straightness});
+    const roundState=round.record({
+      score:result.score.score,
+      success,
+      peakSpeed:strike.peakSpeed,
+      straightness:strike.straightness,
+      intensityRatio:intensity.ratio,
+    });
     showCoach(strike,result);
     updateRound(roundState);
 
@@ -289,7 +313,7 @@ function finishCalibration(){
   const profile=analyzer.finishCalibration();
   calibrated=Boolean(profile.ok);
   setupState.textContent=profile.ok
-    ?`Ready · personal reference ${profile.peak.toFixed(1)} m/s`
+    ?"Ready · personal motion reference set"
     :profile.reason==="movement-too-slow"
       ?"Calibration failed · make 3–5 clear comfortable punches"
       :"Calibration failed · keep your full upper body visible";
