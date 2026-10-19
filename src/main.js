@@ -7,7 +7,7 @@ import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
-import { CandleRenderer } from "./render/candle-renderer.js";
+import { createCandleTarget } from "./render/candle-target.js";
 import { PoseTracker } from "./vision/pose-tracker.js";
 
 const session=new CandleTrainingSession();
@@ -99,7 +99,7 @@ root.innerHTML=`
 const lab=root.querySelector(".lab");
 lab.dataset.live="off";
 const mobileTrainingQuery=window.matchMedia("(max-width: 600px)");
-const candleRenderer=new CandleRenderer(root.querySelector("#target-canvas"),{
+const candleRenderer=createCandleTarget(root.querySelector("#target-canvas"),{
   pixelRatio:mobileTrainingQuery.matches?1.4:2,
 });
 let miniCandleRenderer=null;
@@ -119,7 +119,7 @@ function syncRendererMode(){
   const useMini=mobileTrainingQuery.matches&&cameraStarted&&!document.hidden;
   if(useMini){
     if(!miniCandleRenderer){
-      miniCandleRenderer=new CandleRenderer(miniTargetContainer,{
+      miniCandleRenderer=createCandleTarget(miniTargetContainer,{
         pixelRatio:1,
         interactive:false,
       });

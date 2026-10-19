@@ -45,3 +45,17 @@
 .file-button{min-height:40px;display:inline-flex;align-items:center;border:1px solid #45483f;border-radius:999px;background:transparent;color:#e8e3d4;padding:0 15px;cursor:pointer;font-size:.82rem}
 .file-button input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .file-button:focus-within{outline:2px solid #e2d9bb;outline-offset:3px}
+
+.fallback-target{position:absolute;inset:0;display:grid;place-items:center;align-content:end;padding-bottom:14%;overflow:hidden;background:radial-gradient(circle at 50% 38%,#25251f 0,#11120f 58%)}
+.fallback-candle{width:32%;max-width:112px;height:48%;min-height:150px;border-radius:8px 8px 18px 18px;background:linear-gradient(90deg,#c9c5b7,#fbf7eb 48%,#bdb8a8);box-shadow:0 16px 30px rgba(0,0,0,.22)}
+.fallback-wick{width:5px;height:22px;background:#28231d;border-radius:5px;margin-bottom:-1px;z-index:2}
+.fallback-flame-wrap{position:relative;width:74px;height:104px;display:grid;place-items:end center;margin-bottom:-3px;z-index:3}
+.fallback-flame{--fallback-tilt:0deg;--fallback-instability:0;width:46px;height:82px;transform-origin:50% 100%;transform:rotate(var(--fallback-tilt)) scaleX(calc(1 + var(--fallback-instability)*.08));border-radius:50% 50% 44% 44%;background:radial-gradient(circle at 50% 72%,#fff7c8 0 17%,#eda84e 38%,#be4c20 70%,transparent 73%);filter:drop-shadow(0 0 13px rgba(234,158,65,.34));transition:transform 150ms ease,opacity 180ms ease}
+.fallback-flame.is-out{opacity:0;transform:rotate(var(--fallback-tilt)) scale(.25)}
+.fallback-smoke{position:absolute;bottom:52px;width:14px;height:40px;border-radius:50%;background:linear-gradient(to top,rgba(185,185,177,.45),transparent);filter:blur(4px);opacity:0;transform:translateY(0)}
+.fallback-smoke.show{opacity:.55;transform:translateY(-18px);transition:opacity .35s ease,transform 1.1s ease}
+.fallback-air{--fallback-air-strength:.5;position:absolute;left:6%;right:48%;top:35%;height:60px;opacity:0;z-index:4;pointer-events:none}
+.fallback-air i{display:block;height:2px;margin:12px 0;border-radius:99px;background:linear-gradient(90deg,transparent,rgba(216,236,232,.72),transparent);transform:translateX(-35%)}
+.fallback-air i:nth-child(2){width:82%;margin-left:10%}.fallback-air i:nth-child(3){width:64%;margin-left:20%}
+.fallback-air.pulse{animation:fallback-air-pulse .65s ease-out}
+@keyframes fallback-air-pulse{0%{opacity:0;transform:translateX(-22%)}35%{opacity:calc(.35 + var(--fallback-air-strength)*.25)}100%{opacity:0;transform:translateX(115%)}}
