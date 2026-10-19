@@ -9,6 +9,7 @@ const MODEL_URL=sameOriginUrl("models/pose_landmarker_lite.task");
 let landmarker=null;
 let processing=false;
 let guardInstalled=false;
+let modelBuffer=null;
 
 function installSameOriginEgressGuard(){
   if(guardInstalled)return;
@@ -46,9 +47,17 @@ async function loadSdk(){
   PoseLandmarker=sdk.PoseLandmarker;
 }
 
-async function makeLandmarker(vision,delegate){
+async function loadModel(){
+  if(modelBuffer)return modelBuffer;
+  const response=await fetch(MODEL_URL,{cache:"force-cache"});
+  if(!response.ok)throw new Error(`Local pose model unavailable: ${response.status}`);
+  modelBuffer=new Uint8Array(await response.arrayBuffer());
+  return modelBuffer;
+}
+
+async function makeLandmarker(vision,delegate,model){
   return PoseLandmarker.createFromOptions(vision,{
-    baseOptions:{modelAssetPath:MODEL_URL,delegate},
+    baseOptions:{modelAssetBuffer:model,delegate},
     runningMode:"VIDEO",
     numPoses:1,
     minPoseDetectionConfidence:.55,
@@ -60,12 +69,19 @@ async function makeLandmarker(vision,delegate){
 
 async function init(){
   await loadSdk();
-  const vision=await FilesetResolver.forVisionTasks(WASM_ROOT);
+
+  // Official MediaPipe worker pattern: the second argument asks the resolver
+  // for worker-compatible paths instead of trying to inject a loader script.
+  const vision=await FilesetResolver.forVisionTasks(WASM_ROOT,true);
+  vision.wasmLoaderPath=`${vision.wasmLoaderPath}?v=1.1.1`;
+
+  const model=await loadModel();
+
   try{
-    landmarker=await makeLandmarker(vision,"GPU");
+    landmarker=await makeLandmarker(vision,"GPU",model);
     self.postMessage({type:"ready",delegate:"GPU",assetOrigin:self.location.origin});
   }catch(gpuError){
-    landmarker=await makeLandmarker(vision,"CPU");
+    landmarker=await makeLandmarker(vision,"CPU",model);
     self.postMessage({
       type:"ready",
       delegate:"CPU",
