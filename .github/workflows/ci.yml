@@ -33,6 +33,9 @@ jobs:
       - name: Production build
         run: npm run build
 
+      - name: Launch-pack runtime check
+        run: npm run launch:check
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 

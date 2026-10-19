@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 19
+## Current checkpoint — Stage 20
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -43,6 +43,11 @@ GitHub Actions runs:
 
 ## Scientific guardrails
 Camera-derived kinematics remain estimates, not laboratory force measurements. Personal normalization reduces session/device bias but is not a validated biomechanical effort measure. The virtual flame model is physics-inspired, not CFD, and still requires real physical-candle calibration and multi-device field traces before scientific accuracy claims.
+
+## Easy Windows launch
+On Windows, run `START_TRAINING.cmd`. It installs missing locked dependencies, prepares/verifies the local MediaPipe model, starts Vite on `http://127.0.0.1:5173`, waits for the server, and opens the browser.
+
+Run `CHECK_TRAINING.cmd` for a quick unit/build/runtime check before a demo.
 
 ## Main remaining blocker
 Real HTTPS device testing with actual human movement is still required. Automated fake-camera tests prove runtime/privacy/recovery behavior, not punch-recognition quality in real lighting, clothing, camera angles, or devices.

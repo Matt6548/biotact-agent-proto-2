@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "prepare:vision": "node scripts/prepare-mediapipe-assets.mjs",
     "predev": "npm run prepare:vision",
-    "prebuild": "npm run prepare:vision"
+    "prebuild": "npm run prepare:vision",
+    "launch:check": "node scripts/runtime-check.mjs --require-assets"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "1.1.1",
