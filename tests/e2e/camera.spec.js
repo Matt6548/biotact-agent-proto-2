@@ -17,6 +17,9 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   await expect(frameAction).toBeVisible();
   await expect(frameAction).toBeDisabled();
   await expect(page.locator("#setup-state")).toContainText(/frame|body|camera/i);
+  await expect(page.locator("#model-backend")).toHaveText(/GPU|CPU/i);
+  await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
+  await expect(page.locator("#busy-skips")).toHaveText(/^\d+$/);
 
   expect(external).toEqual([]);
 

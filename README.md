@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 20
+## Current checkpoint — Stage 21
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -38,6 +38,7 @@ GitHub Actions runs:
 - production build,
 - desktop + mobile Chromium acceptance,
 - fake-webcam Pose Landmarker initialization with no third-party runtime HTTP(S) requests,
+- real worker diagnostics for delegate, inference latency and busy-frame skips,
 - WebGL/camera resilience checks,
 - screenshots/videos as QA artifacts.
 

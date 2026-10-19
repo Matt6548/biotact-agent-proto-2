@@ -45,7 +45,7 @@ root.innerHTML=`
         <div class="camera-empty" id="camera-empty"><strong>Start training when you are ready</strong><span>Then stand 1.5–2.5 m away with shoulders, elbows, wrists and hips visible.</span></div>
       </div>
       <div class="setup-line"><div><span>Setup</span><strong id="setup-state">Camera not started</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Stop camera</button></div>
-      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div></details>
+      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div></details>
       <p class="camera-note">Use comfortable straight punches for calibration, not maximum effort. Keep real open flames away from the training area.</p>
     </article>
 
@@ -109,7 +109,7 @@ const miniTargetContainer=root.querySelector("#mini-target-canvas");
 const video=root.querySelector("#camera"),overlay=root.querySelector("#pose-overlay"),ctx=overlay.getContext("2d");
 const cameraCard=root.querySelector("#camera-card"),cameraEmpty=root.querySelector("#camera-empty");
 const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelector("#camera-status"),setupState=root.querySelector("#setup-state"),primaryAction=root.querySelector("#primary-action");
-const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
+const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
@@ -250,11 +250,12 @@ function drawPose(landmarks){
   for(const[a,b]of CONNECTIONS){const pa=landmarks[a],pb=landmarks[b];if(!pa||!pb||(pa.visibility??0)<.5||(pb.visibility??0)<.5)continue;ctx.beginPath();ctx.moveTo(pa.x*overlay.width,pa.y*overlay.height);ctx.lineTo(pb.x*overlay.width,pb.y*overlay.height);ctx.stroke();}
   for(const index of[11,12,13,14,15,16,23,24]){const p=landmarks[index];if(!p||(p.visibility??0)<.5)continue;ctx.beginPath();ctx.arc(p.x*overlay.width,p.y*overlay.height,Math.max(4,overlay.width/180),0,Math.PI*2);ctx.fill();}
 }
-function setCameraStatus({state,message}){
+function setCameraStatus({state,message,delegate}){
   cameraStatus.dataset.state=state;
   cameraStatus.textContent=message;
   if(state==="ready"){
     poseReady=true;
+    modelBackendEl.textContent=delegate||"—";
     if(cameraStarted&&!calibrating){
       cameraCard.dataset.pose="missing";
       setupState.textContent="Motion model ready · step into frame";
@@ -328,6 +329,11 @@ function finishCalibration(){
 }
 
 function updateLive(result){
+  if(result.diagnostics){
+    if(result.diagnostics.delegate)modelBackendEl.textContent=result.diagnostics.delegate;
+    inferenceEl.textContent=Number.isFinite(result.diagnostics.inferenceMs)?`${Math.round(result.diagnostics.inferenceMs)} ms`:"—";
+    busySkipsEl.textContent=Number.isFinite(result.diagnostics.busySkipsPerSecond)?String(result.diagnostics.busySkipsPerSecond):"—";
+  }
   if(traceRecorder.active){
     traceRecorder.add(result);
     traceStatus.textContent=`Recording · ${traceRecorder.frames.length} frames`;
@@ -433,7 +439,7 @@ stopCamera.addEventListener("click",()=>{
   tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
   syncRendererMode();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
-  stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
+  stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";modelBackendEl.textContent="—";inferenceEl.textContent="—";busySkipsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
   if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
   updateRound();
 });

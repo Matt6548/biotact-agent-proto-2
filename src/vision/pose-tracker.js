@@ -10,6 +10,8 @@ export class PoseTracker {
     this.lastSentAt = 0;
     this.minFrameIntervalMs = 1000 / 30;
     this.frameTimes = [];
+    this.busySkipTimes = [];
+    this.delegate = null;
   }
 
   async start() {
@@ -51,15 +53,22 @@ export class PoseTracker {
     if (this.video) this.video.srcObject = null;
     this.frameBusy = false;
     this.frameTimes = [];
+    this.busySkipTimes = [];
+    this.delegate = null;
     this.onStatus?.({ state: "idle", message: "Camera stopped" });
+  }
+
+  pruneWindow(values, now) {
+    while (values.length && now - values[0] > 1000) values.shift();
   }
 
   handleWorkerMessage(data) {
     if (data.type === "ready") {
+      this.delegate = data.delegate || "unknown";
       this.onStatus?.({
         state: "ready",
-        message: `Pose model ready · ${data.delegate}`,
-        delegate: data.delegate,
+        message: `Pose model ready · ${this.delegate}`,
+        delegate: this.delegate,
       });
       return;
     }
@@ -68,10 +77,18 @@ export class PoseTracker {
       this.frameBusy = false;
       const now = performance.now();
       this.frameTimes.push(now);
-      while (this.frameTimes.length && now - this.frameTimes[0] > 1000) {
-        this.frameTimes.shift();
-      }
-      this.onResult?.({ ...data, fps: this.frameTimes.length });
+      this.pruneWindow(this.frameTimes, now);
+      this.pruneWindow(this.busySkipTimes, now);
+
+      this.onResult?.({
+        ...data,
+        fps: this.frameTimes.length,
+        diagnostics: {
+          inferenceMs: Number.isFinite(data.inferenceMs) ? data.inferenceMs : null,
+          busySkipsPerSecond: this.busySkipTimes.length,
+          delegate: this.delegate,
+        },
+      });
       return;
     }
 
@@ -92,21 +109,23 @@ export class PoseTracker {
     const callback = async () => {
       if (!this.running) return;
       const now = performance.now();
+      const videoReady = this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+      const due = now - this.lastSentAt >= this.minFrameIntervalMs;
 
-      if (
-        this.worker &&
-        !this.frameBusy &&
-        this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
-        now - this.lastSentAt >= this.minFrameIntervalMs
-      ) {
-        this.lastSentAt = now;
-        this.frameBusy = true;
-        try {
-          const bitmap = await createImageBitmap(this.video);
-          this.worker.postMessage({ type: "frame", bitmap, timestampMs: now }, [bitmap]);
-        } catch (error) {
-          this.frameBusy = false;
-          this.onStatus?.({ state: "error", message: String(error?.message || error) });
+      if (this.worker && videoReady && due) {
+        if (this.frameBusy) {
+          this.busySkipTimes.push(now);
+          this.pruneWindow(this.busySkipTimes, now);
+        } else {
+          this.lastSentAt = now;
+          this.frameBusy = true;
+          try {
+            const bitmap = await createImageBitmap(this.video);
+            this.worker.postMessage({ type: "frame", bitmap, timestampMs: now }, [bitmap]);
+          } catch (error) {
+            this.frameBusy = false;
+            this.onStatus?.({ state: "error", message: String(error?.message || error) });
+          }
         }
       }
 
