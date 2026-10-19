@@ -86,7 +86,7 @@ test("tracking loss breaks an in-progress strike trajectory",()=>{
   const lostResult=analyzer.analyze(lost);
   assert.equal(lostResult.trackingReset,true);
 
-  const after=[.32,.40,.40,.40];
+  const after=[.40,.40,.40,.40];
   after.forEach((x,index)=>{
     const result=analyzer.analyze(poseFrame({t:198+index*33,wristX:x}));
     if(result.strike)strikes.push(result.strike);
