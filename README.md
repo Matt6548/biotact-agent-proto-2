@@ -2,40 +2,35 @@
 
 A clean reboot of the old Biotact prototype into a local-first martial-arts training simulator.
 
-## Safety / history
-- Original Biotact IE-Agent: `legacy/biotact-ie-agent-2025`.
-- Active development: `martial-training-lab`.
-- First target: **Candle Strike**.
+## Current checkpoint — Stage 3
+The working branch now has:
+- MediaPipe camera tracking in a Web Worker,
+- adaptive 5-second personal motion calibration,
+- quality gating and punch-event detection,
+- wrist-speed / trajectory metrics,
+- deterministic virtual-airflow response,
+- an interactive Three.js 3D candle,
+- shader-driven flame deformation/instability,
+- dynamic flame light and post-extinction smoke,
+- local-only attempt history,
+- GitHub CI for unit tests, production build and Playwright/Chromium smoke testing.
 
-## Current checkpoint — Stage 2
-The browser now supports:
-- camera + MediaPipe Pose Landmarker in a Web Worker,
-- upper-body overlay,
-- framing / visibility / processed-FPS quality gate,
-- left/right wrist-speed estimation,
-- punch-event detection,
-- peak speed + trajectory straightness,
-- a 5-second personal calibration pass that adapts strike thresholds,
-- deterministic flame response and scoring,
-- local-only recent-attempt history.
+The 3D scene visualizes deterministic state from the training core. It does not substitute visual effects for measurement.
 
-Calibration asks for comfortable practice punches rather than maximum effort. The resulting thresholds are detector thresholds, not a medical or laboratory assessment.
+## Privacy / limitations
+Camera frames stay in the browser processing path. MediaPipe WASM/model assets are currently downloaded from pinned external URLs on first use. Single-camera motion values remain estimates and are not presented as true impact force. Physical candle calibration is still pending.
 
-## Privacy / runtime
-Camera frames stay in the browser processing path. Stage 2 downloads pinned MediaPipe WASM/model assets on first use; offline bundling remains a later hardening step.
-
-## Stack
-- Vite 8.3.4
-- Three.js 0.186.1 (Stage 3 renderer)
-- MediaPipe Tasks Vision 1.1.1
-- Playwright 1.64.1
-- Node tests + GitHub CI
+## Branches
+- Legacy Biotact: `legacy/biotact-ie-agent-2025`
+- Active: `martial-training-lab`
 
 ## Run
-Requires Node.js 20.19+ or 22.12+.
+Node.js 20.19+ or 22.12+.
 
 ```bash
 npm install
 npm run dev
 npm test
+npx playwright install
+npm run test:e2e
 ```
