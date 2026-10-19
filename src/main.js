@@ -254,7 +254,10 @@ function setCameraStatus({state,message}){
   cameraStatus.textContent=message;
   if(state==="ready"){
     poseReady=true;
-    if(cameraStarted&&!calibrating)setupState.textContent="Motion model ready · step into frame";
+    if(cameraStarted&&!calibrating){
+      cameraCard.dataset.pose="missing";
+      setupState.textContent="Motion model ready · step into frame";
+    }
     updatePrimary();
   }else if(state==="privacy-block"){
     setupState.textContent="External SDK request blocked · training data remains local";
