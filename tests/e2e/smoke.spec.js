@@ -26,7 +26,9 @@ test("focused arena completes one fixed-goal five-strike round",async({page},tes
   await expect(page.locator("#round-summary")).toBeVisible();
   await expect(page.locator("#round-count")).toHaveText("5 / 5");
   await expect(page.locator("#summary-score")).not.toHaveText("—");
-  await expect(page.locator("#arena-goal")).toHaveText("Make the flame unstable");
+  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
+  await expect(page.locator("#round-success")).toHaveText("3 / 3");
+  await expect(page.locator("#level")).toHaveText("Next · 2 · Destabilize");
 
   await page.screenshot({path:testInfo.outputPath("02-round-complete.png"),fullPage:true});
 });

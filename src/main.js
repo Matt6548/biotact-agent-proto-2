@@ -82,20 +82,28 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
-let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,calibrated=false,calibrating=false,roundLevel=null;
+let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
 function levelGoal(level){return level.id===1?"Deflect the flame":level.id===2?"Make the flame unstable":level.id===3?"Extinguish the flame":"Extinguish from longer virtual range";}
 function readHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]").slice(0,8);}catch{return[];}}
 function writeHistory(){localStorage.setItem(HISTORY_KEY,JSON.stringify(attempts.slice(0,8)));}
 function renderHistory(){historyCount.textContent=String(attempts.length);historyEl.innerHTML=attempts.length?attempts.map((a)=>`<li><span>${a.hand}</span><strong>${a.speed.toFixed(1)} m/s</strong><span>${a.straightness}% straight</span><b>${a.score}</b></li>`).join(""):`<li class="empty-history">No recorded attempts yet.</li>`;}
-function displayedLevel(){return round.active&&roundLevel?roundLevel:progression.current();}
+function displayedLevel(){
+  if(round.complete&&lastRoundOutcome?.completedLevel)return lastRoundOutcome.completedLevel;
+  if(round.active&&roundLevel)return roundLevel;
+  return progression.current();
+}
 function updateLevel(){
   const level=displayedLevel();
-  levelEl.textContent=`${level.id} · ${level.name}`;
   arenaGoal.textContent=levelGoal(level);
-  const hits=round.active?Math.min(round.snapshot().successes,progression.requiredSuccesses):0;
+  const hits=(round.active||round.complete)?Math.min(round.snapshot().successes,progression.requiredSuccesses):0;
   levelProgress.textContent=`${hits}/${progression.requiredSuccesses}`;
+  if(round.complete&&lastRoundOutcome?.levelUp){
+    levelEl.textContent=`Next · ${lastRoundOutcome.level.id} · ${lastRoundOutcome.level.name}`;
+  }else{
+    levelEl.textContent=`${level.id} · ${level.name}`;
+  }
 }
 function updatePrimary(){
   if(calibrating){primaryAction.textContent="Calibrating…";primaryAction.disabled=true;return;}
@@ -103,12 +111,13 @@ function updatePrimary(){
   primaryAction.disabled=false;
   if(!cameraStarted)primaryAction.textContent="Start training";
   else if(!calibrated)primaryAction.textContent="Calibrate 5 s";
+  else if(round.complete&&lastRoundOutcome?.levelUp)primaryAction.textContent=`Start next level · ${lastRoundOutcome.level.name}`;
   else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
   else primaryAction.textContent="Start 5-strike round";
 }
 function updateRound(snapshot=round.snapshot()){
   roundCount.textContent=`${snapshot.attempts} / ${snapshot.attemptLimit}`;
-  roundSuccess.textContent=`${snapshot.successes} / ${progression.requiredSuccesses}`;
+  roundSuccess.textContent=`${Math.min(snapshot.successes,progression.requiredSuccesses)} / ${progression.requiredSuccesses}`;
   if(snapshot.complete){
     roundSummary.hidden=false;
     root.querySelector("#summary-score").textContent=String(snapshot.averageScore);
@@ -175,10 +184,11 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
 
     if(roundState.complete){
       const completed=progression.completeRound({successes:roundState.successes});
+      lastRoundOutcome=completed;
       roundLevel=null;
       updateLevel();updatePrimary();
       coachOutcome.textContent=completed.levelUp?`Level complete. Next: ${completed.level.name}.`:`Round complete: ${roundState.successes}/5 target hits. Reach ${progression.requiredSuccesses}/5 to advance.`;
-      if(completed.levelUp)coachCues.innerHTML="<li>New level starts on the next round, so every five-strike set keeps one fixed goal.</li>";
+      if(completed.levelUp)coachCues.innerHTML="<li>The completed round stays attached to its original goal; the new level begins only when you start again.</li>";
       setTimeout(()=>roundSummary.scrollIntoView({behavior:"smooth",block:"nearest"}),250);
     }
   }else{
@@ -220,7 +230,7 @@ function runCalibration(){
   },5000);
 }
 function startRound({simulation=false}={}){
-  round.start();roundLevel=progression.current();roundSummary.hidden=true;updateRound();
+  round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;updateRound();
   coachOutcome.textContent=simulation?"Simulated round active. Use Simulate strike five times.":"Round active. Five controlled strikes.";
   coachCues.innerHTML="";resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";
 }
@@ -230,7 +240,7 @@ stopCamera.addEventListener("click",()=>{
   if(calibrationTimer){clearTimeout(calibrationTimer);calibrationTimer=null;}
   calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;calibrated=false;cameraCard.dataset.camera="off";ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
-  if(round.active){round.reset();roundLevel=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
+  if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
   updateRound();
 });
 

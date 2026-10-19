@@ -153,7 +153,7 @@ export class CandleRenderer{
     this.airGeometry=new THREE.BufferGeometry();
     this.airGeometry.setAttribute("position",new THREE.BufferAttribute(airPositions,3));
     this.airMaterial=new THREE.PointsMaterial({
-      color:0xdde5df,size:.052,transparent:true,opacity:0,depthWrite:false,sizeAttenuation:true,
+      color:0xd8ece8,size:.078,transparent:true,opacity:0,depthWrite:false,sizeAttenuation:true,
       blending:THREE.AdditiveBlending
     });
     this.airPulse=new THREE.Points(this.airGeometry,this.airMaterial);
@@ -196,7 +196,7 @@ export class CandleRenderer{
 
   updateAirPulse(dt,elapsed){
     if(this.airPulseLife<=0){this.airMaterial.opacity=0;return;}
-    this.airPulseLife=Math.max(0,this.airPulseLife-dt*1.75);
+    this.airPulseLife=Math.max(0,this.airPulseLife-dt*.95);
     const progress=1-this.airPulseLife;
     const arr=this.airGeometry.attributes.position.array;
     const packetX=-2.7+progress*3.05;
@@ -208,8 +208,8 @@ export class CandleRenderer{
       arr[i*3+2]=s.depth+Math.cos(elapsed*9+s.phase)*.025*this.airPulseStrength;
     }
     this.airGeometry.attributes.position.needsUpdate=true;
-    this.airMaterial.opacity=Math.sin(Math.PI*progress)*.32*Math.min(1,this.airPulseStrength);
-    this.airMaterial.size=.045+.02*Math.min(1,this.airPulseStrength);
+    this.airMaterial.opacity=Math.sin(Math.PI*progress)*.52*Math.min(1,this.airPulseStrength);
+    this.airMaterial.size=.068+.025*Math.min(1,this.airPulseStrength);
   }
 
   resize(){
