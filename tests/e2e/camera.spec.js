@@ -24,10 +24,25 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   if(testInfo.project.name==="camera-mobile-chromium"){
     expect(mode).toBe("mini");
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(1);
+
     const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
     expect(arenaPosition).toBe("sticky");
+
+    await expect(page.locator(".hero")).toBeHidden();
+    await expect(page.locator(".target-card")).toBeHidden();
+    await expect(page.locator(".history-card")).toBeHidden();
+    await expect(page.locator(".field-test")).toBeHidden();
+    await expect(page.locator(".simulation")).toBeHidden();
+    await expect(page.locator(".camera-card")).toBeVisible();
+
+    await page.screenshot({
+      path:testInfo.outputPath("04-mobile-live-focus.png"),
+      fullPage:true
+    });
   }else{
     expect(mode).toBe("full");
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(0);
+    await expect(page.locator(".hero")).toBeVisible();
+    await expect(page.locator(".target-card")).toBeVisible();
   }
 });

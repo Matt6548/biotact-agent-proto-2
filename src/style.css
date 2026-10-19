@@ -59,3 +59,45 @@
 .fallback-air i:nth-child(2){width:82%;margin-left:10%}.fallback-air i:nth-child(3){width:64%;margin-left:20%}
 .fallback-air.pulse{animation:fallback-air-pulse .65s ease-out}
 @keyframes fallback-air-pulse{0%{opacity:0;transform:translateX(-22%)}35%{opacity:calc(.35 + var(--fallback-air-strength)*.25)}100%{opacity:0;transform:translateX(115%)}}
+
+
+/* Stage 17 — mobile live focus mode */
+@media(max-width:600px){
+  .lab[data-live="on"]{
+    width:100%;
+    padding:0 9px 28px;
+  }
+  .lab[data-live="on"] .hero,
+  .lab[data-live="on"] .target-card,
+  .lab[data-live="on"] .history-card,
+  .lab[data-live="on"] .field-test,
+  .lab[data-live="on"] .simulation{
+    display:none;
+  }
+  .lab[data-live="on"] .arena-status{
+    margin:0 -9px 8px;
+    padding:9px 9px 10px;
+    border-top:0;
+    box-shadow:0 12px 24px rgba(0,0,0,.22);
+  }
+  .lab[data-live="on"] .live-grid{
+    display:block;
+  }
+  .lab[data-live="on"] .camera-card{
+    border-radius:16px;
+    padding:10px;
+  }
+  .lab[data-live="on"] .camera-stage{
+    min-height:0;
+    height:min(72vh,680px);
+    max-height:none;
+    aspect-ratio:auto;
+  }
+  .lab[data-live="on"] .camera-note{
+    margin-bottom:2px;
+  }
+  .lab[data-live="on"] .round-summary:not([hidden]){
+    margin:10px 0 0;
+    border-radius:14px;
+  }
+}
