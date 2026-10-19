@@ -67,3 +67,56 @@ test("poor framing blocks strike emission even when wrist motion is fast",()=>{
   });
   assert.equal(strikes.length,0);
 });
+
+
+test("tracking loss breaks an in-progress strike trajectory",()=>{
+  const analyzer=new LiveTrainingAnalyzer();
+  const strikes=[];
+
+  const before=[0,0,.08,.16,.24];
+  before.forEach((x,index)=>{
+    const result=analyzer.analyze(poseFrame({t:index*33,wristX:x}));
+    if(result.strike)strikes.push(result.strike);
+  });
+
+  const lost=poseFrame({t:165,wristX:.24});
+  lost.landmarks[11].visibility=.1;
+  lost.landmarks[12].visibility=.1;
+  const lostResult=analyzer.analyze(lost);
+  assert.equal(lostResult.trackingReset,true);
+
+  const after=[.32,.40,.40,.40];
+  after.forEach((x,index)=>{
+    const result=analyzer.analyze(poseFrame({t:198+index*33,wristX:x}));
+    if(result.strike)strikes.push(result.strike);
+  });
+
+  assert.equal(strikes.length,0);
+});
+
+test("first good frame after tracking loss primes velocity at zero",()=>{
+  const analyzer=new LiveTrainingAnalyzer();
+  analyzer.analyze(poseFrame({t:0,wristX:0}));
+
+  const lost=poseFrame({t:33,wristX:0});
+  lost.landmarks[23].x=1.2;
+  lost.landmarks[24].x=1.2;
+  lost.landmarks[11].x=1.2;
+  analyzer.analyze(lost);
+
+  const recovered=analyzer.analyze(poseFrame({t:66,wristX:.5}));
+  assert.equal(recovered.quality.ok,true);
+  assert.equal(recovered.trackingPrimed,true);
+  assert.equal(recovered.metrics.leftWristSpeed,0);
+  assert.equal(recovered.strike,null);
+});
+
+test("missing wrist world landmark invalidates tracking safely",()=>{
+  const analyzer=new LiveTrainingAnalyzer();
+  const f=poseFrame({t:0,wristX:0});
+  f.worldLandmarks[15]=null;
+  const result=analyzer.analyze(f);
+  assert.equal(result.quality.ok,false);
+  assert.ok(result.quality.reasons.includes("missing-wrist-world"));
+  assert.equal(result.strike,null);
+});
