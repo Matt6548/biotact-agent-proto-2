@@ -92,8 +92,12 @@ root.innerHTML=`
   </details>
 </main>`;
 
-const candleRenderer=new CandleRenderer(root.querySelector("#target-canvas"));
-const miniCandleRenderer=new CandleRenderer(root.querySelector("#mini-target-canvas"));
+const mobileTrainingQuery=window.matchMedia("(max-width: 600px)");
+const candleRenderer=new CandleRenderer(root.querySelector("#target-canvas"),{
+  pixelRatio:mobileTrainingQuery.matches?1.4:2,
+});
+let miniCandleRenderer=null;
+const miniTargetContainer=root.querySelector("#mini-target-canvas");
 const video=root.querySelector("#camera"),overlay=root.querySelector("#pose-overlay"),ctx=overlay.getContext("2d");
 const cameraCard=root.querySelector("#camera-card"),cameraEmpty=root.querySelector("#camera-empty");
 const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelector("#camera-status"),setupState=root.querySelector("#setup-state"),primaryAction=root.querySelector("#primary-action");
@@ -104,6 +108,33 @@ const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector(
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
 let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
+
+function syncRendererMode(){
+  const useMini=mobileTrainingQuery.matches&&cameraStarted&&!document.hidden;
+  if(useMini){
+    if(!miniCandleRenderer){
+      miniCandleRenderer=new CandleRenderer(miniTargetContainer,{
+        pixelRatio:1,
+        interactive:false,
+      });
+      miniCandleRenderer.setState(session.flame.snapshot());
+    }
+    candleRenderer.setActive(false);
+    miniCandleRenderer.setActive(true);
+    cameraCard.dataset.rendererMode="mini";
+    return;
+  }
+
+  if(miniCandleRenderer){
+    miniCandleRenderer.dispose();
+    miniCandleRenderer=null;
+  }
+  candleRenderer.setActive(!document.hidden);
+  cameraCard.dataset.rendererMode=document.hidden?"paused":"full";
+}
+
+mobileTrainingQuery.addEventListener?.("change",syncRendererMode);
+document.addEventListener("visibilitychange",syncRendererMode);
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
 function levelGoal(level){return level.id===1?"Deflect the flame":level.id===2?"Make the flame unstable":level.id===3?"Extinguish the flame":"Extinguish from longer virtual range";}
@@ -166,12 +197,19 @@ function flashResult(result){
   hitFeedback.classList.remove("show");void hitFeedback.offsetWidth;hitFeedback.classList.add("show");
   clearTimeout(hitTimer);hitTimer=setTimeout(()=>hitFeedback.classList.remove("show"),1100);
 }
-function resetCandleOnly(){session.reset();candleRenderer.reset();miniCandleRenderer.reset();flameState.textContent="Stable flame";}
+function resetCandleOnly(){
+  session.reset();
+  candleRenderer.reset();
+  miniCandleRenderer?.reset();
+  flameState.textContent="Stable flame";
+}
 function scheduleRelight(){clearTimeout(relightTimer);relightTimer=setTimeout(resetCandleOnly,2200);}
 function renderFlame(result,strikeLabel){
   const impulse=Math.min(1.35,(result.flame.effectiveStress??.3)*1.25);
-  candleRenderer.triggerImpulse(impulse);miniCandleRenderer.triggerImpulse(impulse);
-  candleRenderer.setState(result.flame);miniCandleRenderer.setState(result.flame);
+  candleRenderer.triggerImpulse(impulse);
+  miniCandleRenderer?.triggerImpulse(impulse);
+  candleRenderer.setState(result.flame);
+  miniCandleRenderer?.setState(result.flame);
   flameState.textContent=result.flame.extinguished?"Flame extinguished":result.flame.instability>.65?"Flame highly unstable":result.flame.tilt>.3?"Flame deflected":"Flame disturbed";
   score.textContent=String(result.score.score);lastStrike.textContent=strikeLabel||result.score.grade;flashResult(result);
 }
@@ -263,6 +301,7 @@ async function startCameraFlow(){
   try{
     analyzer.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
     cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    syncRendererMode();
     setupState.textContent=poseReady?"Motion model ready · calibrate next":"Camera ready · loading motion model…";
   }catch(error){setCameraStatus({state:"error",message:error?.message||"Camera failed"});setupState.textContent="Camera permission or device unavailable";cameraStarted=false;}
   updatePrimary();
@@ -294,7 +333,9 @@ stopCamera.addEventListener("click",()=>{
     traceStatus.textContent=`Camera stopped · trace closed at ${trace.frameCount} frames.`;
   }
   if(calibrationTimer){clearTimeout(calibrationTimer);calibrationTimer=null;}
-  calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
+  calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";
+  syncRendererMode();
+  ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
   if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
   updateRound();

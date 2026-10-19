@@ -44,9 +44,13 @@ void main(){
 `;
 
 export class CandleRenderer{
-  constructor(container){
+  constructor(container,{active=true,pixelRatio=2,interactive=true}={}){
     this.container=container;
     this.clock=new THREE.Clock();
+    this.active=false;
+    this.raf=null;
+    this.pixelRatioCap=pixelRatio;
+    this.interactive=interactive;
     this.state={tilt:0,instability:0,stability:1,extinguished:false};
     this.wasExtinguished=false;
     this.smokeLife=0;
@@ -58,7 +62,7 @@ export class CandleRenderer{
     this.camera.position.set(3.4,2.7,5.6);
 
     this.renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:"high-performance"});
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,this.pixelRatioCap));
     this.renderer.outputColorSpace=THREE.SRGBColorSpace;
     this.renderer.toneMapping=THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure=1.05;
@@ -68,7 +72,8 @@ export class CandleRenderer{
     container.appendChild(this.renderer.domElement);
 
     this.controls=new OrbitControls(this.camera,this.renderer.domElement);
-    this.controls.enableDamping=true;
+    this.controls.enableDamping=this.interactive;
+    this.controls.enabled=this.interactive;
     this.controls.enablePan=false;
     this.controls.minDistance=4.3;
     this.controls.maxDistance=7.4;
@@ -80,7 +85,8 @@ export class CandleRenderer{
     this.resizeObserver=new ResizeObserver(()=>this.resize());
     this.resizeObserver.observe(container);
     this.resize();
-    this.animate();
+    this.renderOnce();
+    this.setActive(active);
   }
 
   makeScene(){
@@ -218,7 +224,30 @@ export class CandleRenderer{
     this.renderer.setSize(width,height,false);
   }
 
+  setActive(active){
+    const next=Boolean(active);
+    if(next===this.active)return;
+    this.active=next;
+    if(next){
+      this.clock.start();
+      this.animate();
+    }else{
+      if(this.raf)cancelAnimationFrame(this.raf);
+      this.raf=null;
+      this.renderOnce();
+    }
+  }
+
+  renderOnce(){
+    this.controls.update();
+    this.renderer.render(this.scene,this.camera);
+  }
+
   animate=()=>{
+    if(!this.active){
+      this.raf=null;
+      return;
+    }
     this.raf=requestAnimationFrame(this.animate);
     const dt=Math.min(this.clock.getDelta(),.05),elapsed=this.clock.elapsedTime;
     this.controls.update();
@@ -243,7 +272,10 @@ export class CandleRenderer{
   }
 
   dispose(){
-    cancelAnimationFrame(this.raf);this.resizeObserver.disconnect();this.controls.dispose();
+    this.active=false;
+    if(this.raf)cancelAnimationFrame(this.raf);
+    this.raf=null;
+    this.resizeObserver.disconnect();this.controls.dispose();
     this.renderer.dispose();this.container.replaceChildren();
   }
 }

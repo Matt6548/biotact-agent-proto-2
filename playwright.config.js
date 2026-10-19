@@ -27,6 +27,20 @@ export default defineConfig({
           ]
         }
       }
+    },
+    {
+      name:"camera-mobile-chromium",
+      testMatch:/camera\.spec\.js/,
+      use:{
+        ...devices["Pixel 7"],
+        permissions:["camera"],
+        launchOptions:{
+          args:[
+            "--use-fake-device-for-media-stream",
+            "--use-fake-ui-for-media-stream"
+          ]
+        }
+      }
     }
   ],
   use:{
