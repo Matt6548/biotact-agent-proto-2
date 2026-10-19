@@ -11,6 +11,33 @@ export function velocityBetween(previous, current) {
   }) / dt;
 }
 
+export class RollingMedian {
+  constructor(size = 3) {
+    this.size = Math.max(1, Math.floor(size));
+    this.values = [];
+  }
+
+  push(value) {
+    if (!Number.isFinite(value)) return this.current();
+    this.values.push(value);
+    if (this.values.length > this.size) this.values.shift();
+    return this.current();
+  }
+
+  current() {
+    if (!this.values.length) return 0;
+    const sorted = [...this.values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2
+      ? sorted[mid]
+      : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+
+  reset() {
+    this.values = [];
+  }
+}
+
 export function averageVisibility(landmarks = [], indices = []) {
   if (!indices.length) return 0;
   const values = indices.map((index) => landmarks[index]?.visibility ?? 0);

@@ -17,3 +17,7 @@ The training loop now includes:
 - local history, reduced-motion handling, desktop/mobile Chromium QA and videos.
 
 Scientific guardrails remain unchanged: camera motion values are estimates, not true impact force; the flame model is physics-inspired and still requires physical calibration.
+
+
+## Stage 10 — field-test capture
+A developer-only Field test data section can record up to 900 processed pose frames and export them as JSON. The trace contains only numeric pose coordinates/timestamps/FPS; it does not contain images, video or audio. A 3-frame median on wrist speed reduces single-frame spikes before strike detection.

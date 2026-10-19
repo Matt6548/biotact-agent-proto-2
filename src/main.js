@@ -2,6 +2,7 @@ import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
+import { MotionTraceRecorder } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
 import { CandleRenderer } from "./render/candle-renderer.js";
@@ -11,6 +12,7 @@ const session=new CandleTrainingSession();
 const analyzer=new LiveTrainingAnalyzer();
 const progression=new TrainingProgression();
 const round=new TrainingRound({attemptLimit:5});
+const traceRecorder=new MotionTraceRecorder({maxFrames:900});
 const root=document.querySelector("#app");
 const HISTORY_KEY="martial-training-lab.attempts.v1";
 
@@ -62,6 +64,21 @@ root.innerHTML=`
 
   <details class="history-card"><summary>Recent attempts <span id="history-count">0</span></summary><div class="history-head"><span>Stored only in this browser</span><button class="text-button" id="clear-history" type="button">Clear</button></div><ol id="history" class="history-list"></ol></details>
 
+  <details class="field-test">
+    <summary>Field test data</summary>
+    <div class="field-test-body">
+      <div>
+        <strong>Motion trace</strong>
+        <p>Records only pose coordinates, timestamps and FPS — no camera image, video or audio.</p>
+      </div>
+      <div class="field-test-actions">
+        <button id="trace-toggle" class="secondary-button" type="button">Start motion trace</button>
+        <button id="trace-export" class="secondary-button" type="button" disabled>Export JSON</button>
+      </div>
+      <span id="trace-status">No trace recorded.</span>
+    </div>
+  </details>
+
   <details class="simulation"><summary>Engineering simulation controls</summary>
     <div class="demo-actions"><button id="demo-round" class="secondary-button" type="button">Start simulated round</button><span>Developer path for QA without a webcam.</span></div>
     <form id="controls" class="controls">
@@ -82,6 +99,7 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
+const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceStatus=root.querySelector("#trace-status");
 let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
@@ -218,6 +236,15 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
 }
 
 function updateLive(result){
+  if(traceRecorder.active){
+    traceRecorder.add(result);
+    traceStatus.textContent=`Recording · ${traceRecorder.frames.length} frames`;
+    if(!traceRecorder.active){
+      traceToggle.textContent="Start motion trace";
+      traceExport.disabled=traceRecorder.frames.length===0;
+      traceStatus.textContent=`Trace capped · ${traceRecorder.frames.length} frames`;
+    }
+  }
   drawPose(result.landmarks);const analysis=analyzer.analyze(result);
   if(!analysis.metrics){qualityEl.textContent="No pose";return;}
   fpsEl.textContent=String(analysis.metrics.fps);leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} m/s`;rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} m/s`;
@@ -274,3 +301,39 @@ root.querySelector("#controls").addEventListener("submit",(event)=>{
 });
 root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightTimer);resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";coachOutcome.textContent=round.active?"Round active. Five controlled strikes.":"Start training to begin.";coachCues.innerHTML="";});
 root.querySelector("#clear-history").addEventListener("click",()=>{attempts=[];writeHistory();renderHistory();});
+
+traceToggle.addEventListener("click",()=>{
+  if(traceRecorder.active){
+    const trace=traceRecorder.stop();
+    traceToggle.textContent="Start motion trace";
+    traceExport.disabled=trace.frameCount===0;
+    traceStatus.textContent=`Recorded ${trace.frameCount} frames. Ready to export.`;
+    return;
+  }
+  if(!cameraStarted||!poseReady){
+    traceStatus.textContent="Start the camera and wait for the motion model first.";
+    return;
+  }
+  traceRecorder.start();
+  traceToggle.textContent="Stop motion trace";
+  traceExport.disabled=true;
+  traceStatus.textContent="Recording numeric pose data…";
+});
+
+traceExport.addEventListener("click",()=>{
+  const trace=traceRecorder.export();
+  if(!trace.frameCount){
+    traceStatus.textContent="No trace to export.";
+    return;
+  }
+  const blob=new Blob([JSON.stringify(trace,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`candle-strike-motion-trace-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  traceStatus.textContent=`Exported ${trace.frameCount} numeric frames.`;
+});

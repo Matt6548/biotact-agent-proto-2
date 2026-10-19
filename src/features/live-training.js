@@ -1,5 +1,5 @@
 import { SpeedCalibration } from "../core/calibration.js";
-import { averageVisibility, inFrameRatio, qualityGate, velocityBetween } from "../core/motion-model.js";
+import { averageVisibility, inFrameRatio, qualityGate, RollingMedian, velocityBetween } from "../core/motion-model.js";
 import { StrikeDetector } from "../core/strike-detector.js";
 
 const KEY={leftShoulder:11,rightShoulder:12,leftElbow:13,rightElbow:14,leftWrist:15,rightWrist:16,leftHip:23,rightHip:24};
@@ -9,6 +9,7 @@ export class LiveTrainingAnalyzer{
   constructor(){
     this.detectors={left:new StrikeDetector(),right:new StrikeDetector()};
     this.previous={left:null,right:null};
+    this.speedFilters={left:new RollingMedian(3),right:new RollingMedian(3)};
     this.calibration=new SpeedCalibration();
     this.profile=null;
   }
@@ -16,6 +17,8 @@ export class LiveTrainingAnalyzer{
   reset(){
     this.detectors.left.reset();
     this.detectors.right.reset();
+    this.speedFilters.left.reset();
+    this.speedFilters.right.reset();
     this.previous={left:null,right:null};
   }
 
@@ -45,8 +48,11 @@ export class LiveTrainingAnalyzer{
 
     const leftPoint={...worldLandmarks[KEY.leftWrist],t:timestampMs};
     const rightPoint={...worldLandmarks[KEY.rightWrist],t:timestampMs};
-    const leftSpeed=velocityBetween(this.previous.left,leftPoint);
-    const rightSpeed=velocityBetween(this.previous.right,rightPoint);
+
+    const rawLeftSpeed=velocityBetween(this.previous.left,leftPoint);
+    const rawRightSpeed=velocityBetween(this.previous.right,rightPoint);
+    const leftSpeed=this.speedFilters.left.push(rawLeftSpeed);
+    const rightSpeed=this.speedFilters.right.push(rawRightSpeed);
     const maxWristSpeed=Math.max(leftSpeed,rightSpeed);
 
     if(this.calibration.active&&visibility>=0.65&&bodyCoverage>=0.6){
@@ -66,7 +72,14 @@ export class LiveTrainingAnalyzer{
 
     return{
       quality,
-      metrics:{visibility,bodyCoverage,fps,leftWristSpeed:leftSpeed,rightWristSpeed:rightSpeed,maxWristSpeed},
+      metrics:{
+        visibility,bodyCoverage,fps,
+        leftWristSpeed:leftSpeed,
+        rightWristSpeed:rightSpeed,
+        rawLeftWristSpeed:rawLeftSpeed,
+        rawRightWristSpeed:rawRightSpeed,
+        maxWristSpeed
+      },
       strike,
       calibrating:this.calibration.active,
       profile:this.profile,
