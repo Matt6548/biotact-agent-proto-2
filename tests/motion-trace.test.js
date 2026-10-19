@@ -31,6 +31,8 @@ test("recorder caps frame count and preserves detector profile",()=>{
   assert.equal(trace.frameCount,2);
   assert.equal(trace.detectorProfile.detector.startSpeed,1.2);
   assert.match(trace.privacy,/No image, video, audio/i);
+  assert.match(trace.privacy,/sensitive movement data/i);
+  assert.match(trace.privacy,/remain local/i);
   assert.equal(validateMotionTrace(trace).ok,true);
 });
 

@@ -74,13 +74,14 @@ root.innerHTML=`
     <div class="field-test-body">
       <div>
         <strong>Motion trace</strong>
-        <p>Records only pose coordinates, timestamps and FPS — no camera image, video or audio.</p>
+        <p>Records numeric motion coordinates, timestamps and FPS — no camera image, video or audio. Motion traces can still be sensitive movement data and stay local unless you explicitly export/share them.</p>
       </div>
       <div class="field-test-actions">
         <button id="trace-toggle" class="secondary-button" type="button">Start motion trace</button>
         <button id="trace-export" class="secondary-button" type="button" disabled>Export JSON</button>
         <label class="file-button">Import JSON<input id="trace-import" type="file" accept=".json,application/json" /></label>
         <button id="trace-replay" class="secondary-button" type="button" disabled>Replay analysis</button>
+        <button id="trace-clear" class="secondary-button" type="button" disabled>Clear trace</button>
       </div>
       <span id="trace-status">No trace recorded.</span>
     </div>
@@ -112,7 +113,7 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
-const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceStatus=root.querySelector("#trace-status");
+const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
 let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 
@@ -455,7 +456,8 @@ traceToggle.addEventListener("click",()=>{
     const trace=traceRecorder.stop();
     traceToggle.textContent="Start motion trace";
     traceExport.disabled=trace.frameCount===0;
-    traceStatus.textContent=`Recorded ${trace.frameCount} frames. Ready to export.`;
+    traceClear.disabled=trace.frameCount===0;
+    traceStatus.textContent=`Recorded ${trace.frameCount} frames. Kept in this tab until cleared or re-recorded.`;
     return;
   }
   if(!cameraStarted||!poseReady){
@@ -463,6 +465,9 @@ traceToggle.addEventListener("click",()=>{
     return;
   }
   traceRecorder.start({detectorProfile:analyzer.profile});
+  importedTrace=null;
+  traceReplay.disabled=true;
+  traceClear.disabled=false;
   traceToggle.textContent="Stop motion trace";
   traceExport.disabled=true;
   traceStatus.textContent="Recording numeric pose data…";
@@ -497,7 +502,8 @@ traceImport.addEventListener("change",async()=>{
     if(!validation.ok)throw new Error(validation.reason);
     importedTrace=parsed;
     traceReplay.disabled=false;
-    traceStatus.textContent=`Loaded ${validation.frameCount} frames for replay.`;
+    traceClear.disabled=false;
+    traceStatus.textContent=`Loaded ${validation.frameCount} frames locally for replay.`;
   }catch(error){
     traceStatus.textContent=`Import failed · ${error?.message||"invalid JSON"}`;
   }
@@ -533,4 +539,20 @@ traceReplay.addEventListener("click",async()=>{
     replayingTrace=false;
     traceReplay.disabled=false;
   }
+});
+
+
+traceClear.addEventListener("click",()=>{
+  if(traceRecorder.active){
+    traceRecorder.stop();
+  }
+  traceRecorder.reset();
+  importedTrace=null;
+  replayingTrace=false;
+  traceImport.value="";
+  traceToggle.textContent="Start motion trace";
+  traceExport.disabled=true;
+  traceReplay.disabled=true;
+  traceClear.disabled=true;
+  traceStatus.textContent="Trace cleared from this tab.";
 });

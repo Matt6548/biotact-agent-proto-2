@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 18
+## Current checkpoint — Stage 19
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -18,8 +18,8 @@ The active branch is `martial-training-lab`.
 - model + WASM are self-hosted from the app origin;
 - worker blocks cross-origin fetch/XHR;
 - production CSP uses `connect-src 'self'`;
-- numeric field traces contain landmarks/timestamps/FPS only, never camera frames/audio;
-- record → export → import → replay loop for reproducible tuning.
+- numeric field traces contain landmarks/timestamps/FPS only, never raw camera frames/audio; motion traces are still treated as sensitive data and are never uploaded automatically;
+- record → export → import → replay loop for reproducible tuning, with explicit in-tab trace clearing.
 
 ### Reliability
 - stable-pose gate before calibration;

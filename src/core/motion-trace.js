@@ -90,7 +90,7 @@ export class MotionTraceRecorder{
       schema:"martial-training-motion-trace/v1",
       createdAt:new Date(this.startedAt||Date.now()).toISOString(),
       stoppedAt:this.stoppedAt?new Date(this.stoppedAt).toISOString():null,
-      privacy:"Numeric pose landmarks only. No image, video, audio, name or location.",
+      privacy:"Numeric motion landmarks only. No image, video, audio, name or location. Motion traces can still be sensitive movement data; they remain local unless you explicitly export or share the file.",
       detectorProfile:this.detectorProfile,
       frameCount:this.frames.length,
       frames:this.frames,
