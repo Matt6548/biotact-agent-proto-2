@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 21.1
+## Current checkpoint — Stage 22
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -49,6 +49,9 @@ Camera-derived kinematics remain estimates, not laboratory force measurements. P
 On Windows, run `START_TRAINING.cmd`. It installs missing locked dependencies, prepares/verifies the local MediaPipe model, starts Vite on `http://127.0.0.1:5173`, waits for the server, and opens the browser.
 
 Run `CHECK_TRAINING.cmd` for a quick unit/build/runtime check before a demo.
+
+## Portable demo
+Every successful CI run now publishes a `martial-training-windows-demo` artifact. It contains the already-built app, local MediaPipe model/WASM and a one-click `OPEN_DEMO.cmd` launcher. Runtime requires Python 3 only; no Node/npm is needed for the packaged demo.
 
 ## Main remaining blocker
 Real HTTPS device testing with actual human movement is still required. Automated fake-camera tests prove runtime/privacy/recovery behavior, not punch-recognition quality in real lighting, clothing, camera angles, or devices.

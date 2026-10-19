@@ -36,11 +36,48 @@ jobs:
       - name: Launch-pack runtime check
         run: npm run launch:check
 
+      - name: Verify portable demo server headers
+        shell: bash
+        run: |
+          python3 PORTABLE_SERVER.py --root dist --host 127.0.0.1 --port 4190 > /tmp/martial-portable.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS -D /tmp/martial-headers.txt -o /tmp/martial-index.html http://127.0.0.1:4190/; then
+              break
+            fi
+            sleep 0.25
+          done
+          test -s /tmp/martial-index.html
+          grep -qi '^Content-Security-Policy:' /tmp/martial-headers.txt
+          grep -qi '^Cross-Origin-Opener-Policy: same-origin' /tmp/martial-headers.txt
+          grep -qi '^Cross-Origin-Embedder-Policy: require-corp' /tmp/martial-headers.txt
+          grep -qi '^Permissions-Policy: camera=(self)' /tmp/martial-headers.txt
+          kill "$server_pid"
+          trap - EXIT
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Browser acceptance — desktop, mobile and fake camera
         run: npm run test:e2e
+
+      - name: Prepare portable Windows demo
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p release/martial-training-windows-demo
+          cp -R dist release/martial-training-windows-demo/dist
+          cp OPEN_DEMO.cmd RUN_DEMO_SERVER.cmd PORTABLE_SERVER.py README_PORTABLE.txt release/martial-training-windows-demo/
+
+      - name: Upload portable Windows demo
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: martial-training-windows-demo
+          path: release/martial-training-windows-demo/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Upload QA and dependency evidence
         if: always()
