@@ -2,6 +2,7 @@ import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
+import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
@@ -13,6 +14,8 @@ const analyzer=new LiveTrainingAnalyzer();
 const progression=new TrainingProgression();
 const round=new TrainingRound({attemptLimit:5});
 const traceRecorder=new MotionTraceRecorder({maxFrames:900});
+const poseReadiness=new StableReadiness({requiredConsecutive:6});
+const calibrationClock=new ValidDurationGate({requiredMs:5000,maxStepMs:100});
 const root=document.querySelector("#app");
 const HISTORY_KEY="martial-training-lab.attempts.v1";
 
@@ -107,7 +110,7 @@ const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySele
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
-let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
+let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 
 function syncRendererMode(){
   const useMini=mobileTrainingQuery.matches&&cameraStarted&&!document.hidden;
@@ -163,6 +166,7 @@ function updatePrimary(){
   primaryAction.disabled=false;
   if(!cameraStarted)primaryAction.textContent="Start training";
   else if(!poseReady){primaryAction.textContent="Loading motion model…";primaryAction.disabled=true;}
+  else if(!calibrated&&!poseReadiness.ready){primaryAction.textContent="Step into frame";primaryAction.disabled=true;}
   else if(!calibrated)primaryAction.textContent="Calibrate 5 s";
   else if(round.complete&&lastRoundOutcome?.levelUp)primaryAction.textContent=`Start next level · ${lastRoundOutcome.level.name}`;
   else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
@@ -278,6 +282,20 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
   return result;
 }
 
+function finishCalibration(){
+  if(!calibrating)return;
+  calibrating=false;
+  calibrationClock.reset();
+  const profile=analyzer.finishCalibration();
+  calibrated=Boolean(profile.ok);
+  setupState.textContent=profile.ok
+    ?`Ready · personal reference ${profile.peak.toFixed(1)} m/s`
+    :profile.reason==="movement-too-slow"
+      ?"Calibration failed · make 3–5 clear comfortable punches"
+      :"Calibration failed · keep your full upper body visible";
+  updatePrimary();
+}
+
 function updateLive(result){
   if(traceRecorder.active){
     traceRecorder.add(result);
@@ -288,18 +306,59 @@ function updateLive(result){
       traceStatus.textContent=`Trace capped · ${traceRecorder.frames.length} frames`;
     }
   }
-  drawPose(result.landmarks);const analysis=analyzer.analyze(result);
-  if(!analysis.metrics){qualityEl.textContent="No pose";return;}
-  fpsEl.textContent=String(analysis.metrics.fps);leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} m/s`;rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} m/s`;
-  qualityEl.textContent=analysis.calibrating?"Calibrating":analysis.quality.ok?"Ready":analysis.quality.reasons.join(" · ");
-  setupState.textContent=analysis.calibrating?"Calibration in progress":analysis.quality.ok?(calibrated?"Ready for round":"Camera ready · calibrate next"):"Adjust framing";
+  drawPose(result.landmarks);
+  const analysis=analyzer.analyze(result);
+
+  if(!analysis.metrics){
+    poseReadiness.update(false);
+    qualityEl.textContent="No pose";
+    if(calibrating){
+      calibrationClock.update({timestampMs:result.timestampMs,valid:false});
+      setupState.textContent="Calibration paused · body not detected";
+    }else if(poseReady){
+      setupState.textContent="Step fully into frame";
+    }
+    updatePrimary();
+    return;
+  }
+
+  const readiness=poseReadiness.update(analysis.quality.ok);
+  fpsEl.textContent=String(analysis.metrics.fps);
+  leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} m/s`;
+  rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} m/s`;
+  qualityEl.textContent=analysis.calibrating
+    ?analysis.quality.ok?"Calibrating":"Paused"
+    :readiness.ready?"Ready":analysis.quality.ok?"Hold position":analysis.quality.reasons.join(" · ");
+
+  if(calibrating){
+    const clock=calibrationClock.update({
+      timestampMs:result.timestampMs,
+      valid:analysis.quality.ok,
+    });
+    if(analysis.quality.ok){
+      setupState.textContent=`Move now · ${(clock.remainingMs/1000).toFixed(1)} s valid`;
+    }else{
+      setupState.textContent="Calibration paused · adjust framing";
+    }
+    if(clock.complete)finishCalibration();
+  }else{
+    setupState.textContent=calibrated
+      ?"Ready for round"
+      :readiness.ready
+        ?"Pose stable · calibrate next"
+        :analysis.quality.ok
+          ?"Hold position…"
+          :"Adjust framing";
+  }
+
+  updatePrimary();
   if(analysis.strike)processStrike(analysis.strike);
 }
 
 async function startCameraFlow(){
   primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
   try{
-    analyzer.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
+    analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
     cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
     syncRendererMode();
     setupState.textContent=poseReady?"Motion model ready · calibrate next":"Camera ready · loading motion model…";
@@ -307,16 +366,12 @@ async function startCameraFlow(){
   updatePrimary();
 }
 function runCalibration(){
-  if(!tracker||!poseReady||calibrationTimer||calibrating)return;
-  analyzer.startCalibration();calibrating=true;setupState.textContent="Move now · 5 s";updatePrimary();
-  let remaining=5;
-  const tick=setInterval(()=>{remaining-=1;if(remaining>0)setupState.textContent=`Move now · ${remaining} s`;},1000);
-  calibrationTimer=setTimeout(()=>{
-    clearInterval(tick);calibrationTimer=null;calibrating=false;
-    const profile=analyzer.finishCalibration();calibrated=Boolean(profile.ok);
-    setupState.textContent=profile.ok?`Ready · personal reference ${profile.peak.toFixed(1)} m/s`:"Calibration failed · try 3–5 clear punches";
-    updatePrimary();
-  },5000);
+  if(!tracker||!poseReady||!poseReadiness.ready||calibrating)return;
+  analyzer.startCalibration();
+  calibrationClock.start();
+  calibrating=true;
+  setupState.textContent="Move now · 5.0 s valid";
+  updatePrimary();
 }
 function startRound({simulation=false}={}){
   round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;updateRound();
@@ -332,8 +387,12 @@ stopCamera.addEventListener("click",()=>{
     traceExport.disabled=trace.frameCount===0;
     traceStatus.textContent=`Camera stopped · trace closed at ${trace.frameCount} frames.`;
   }
-  if(calibrationTimer){clearTimeout(calibrationTimer);calibrationTimer=null;}
-  calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";
+  if(calibrating){
+    calibrating=false;
+    calibrationClock.reset();
+  }
+  poseReadiness.reset();
+  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";
   syncRendererMode();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";

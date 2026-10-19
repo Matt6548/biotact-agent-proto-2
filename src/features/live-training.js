@@ -62,7 +62,7 @@ export class LiveTrainingAnalyzer{
     const rightSpeed=this.speedFilters.right.push(rawRightSpeed);
     const maxWristSpeed=Math.max(leftSpeed,rightSpeed);
 
-    if(this.calibration.active&&visibility>=0.65&&bodyCoverage>=0.6){
+    if(this.calibration.active&&quality.ok){
       this.calibration.add(maxWristSpeed);
     }
 

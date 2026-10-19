@@ -13,8 +13,10 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   await page.getByRole("button",{name:"Start training"}).click();
 
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
-  await expect(page.getByRole("button",{name:"Calibrate 5 s"})).toBeVisible();
-  await expect(page.locator("#setup-state")).toContainText(/ready/i);
+  const frameAction=page.getByRole("button",{name:"Step into frame"});
+  await expect(frameAction).toBeVisible();
+  await expect(frameAction).toBeDisabled();
+  await expect(page.locator("#setup-state")).toContainText(/frame|body|camera/i);
 
   expect(external).toEqual([]);
 
