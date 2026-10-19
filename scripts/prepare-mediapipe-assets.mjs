@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 
 const require=createRequire(import.meta.url);
 const MODEL_URL="https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task";
+const EXPECTED_MODEL_SHA256="59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a";
 const ROOT=process.cwd();
 const wasmDest=path.join(ROOT,"public","mediapipe","wasm");
 const modelDest=path.join(ROOT,"public","models");
@@ -33,6 +34,9 @@ if(!fs.existsSync(modelPath)||fs.statSync(modelPath).size<1_000_000){
 
 const modelBytes=fs.readFileSync(modelPath);
 const hash=crypto.createHash("sha256").update(modelBytes).digest("hex");
+if(hash!==EXPECTED_MODEL_SHA256){
+  throw new Error(`Pose model integrity mismatch. Expected ${EXPECTED_MODEL_SHA256}, got ${hash}`);
+}
 fs.writeFileSync(
   provenancePath,
   [
