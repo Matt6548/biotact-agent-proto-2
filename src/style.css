@@ -18,7 +18,7 @@
 
 @media(max-width:600px){
   .lab{width:min(100% - 18px,1180px);padding-top:20px}.hero{padding-bottom:16px}.hero h1{font-size:clamp(2.6rem,14vw,4.8rem)}.lede{font-size:.98rem}
-  .arena-status{position:sticky;top:0;z-index:20;grid-template-columns:1.2fr .8fr;padding:9px 0;background:#0f100e}.arena-status div:nth-child(3){display:none}.arena-status button{grid-column:1/-1;min-height:50px}
+  .arena-status{grid-template-columns:1.2fr .8fr;padding:9px 0;background:#0f100e}.lab[data-live="on"] .arena-status{position:sticky;top:0;z-index:20}.arena-status div:nth-child(3){display:none}.arena-status button{grid-column:1/-1;min-height:50px}
   .live-grid{gap:10px}.camera-card,.target-card{padding:11px;border-radius:16px}.camera-stage{aspect-ratio:4/5;max-height:72vh}.camera-empty span{max-width:30ch}
   .camera-card[data-camera="on"] .mini-target{display:block;position:absolute;right:10px;top:10px;width:112px;height:150px;z-index:4;border:1px solid rgba(220,216,202,.28);border-radius:12px;overflow:hidden;background:#11120f;box-shadow:0 10px 30px rgba(0,0,0,.3)}
   .mini-target canvas{width:100%;height:100%;display:block;touch-action:none}.hit-feedback{bottom:14px;max-width:88%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -24,6 +24,8 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   if(testInfo.project.name==="camera-mobile-chromium"){
     expect(mode).toBe("mini");
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(1);
+    const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
+    expect(arenaPosition).toBe("sticky");
   }else{
     expect(mode).toBe("full");
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(0);

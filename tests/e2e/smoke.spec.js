@@ -38,6 +38,8 @@ test("mobile focused arena has one primary action and no horizontal overflow",as
   await page.goto("/");
   await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
   await expect(page.locator(".tracking-details")).not.toHaveAttribute("open","");
+  const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
+  expect(arenaPosition).not.toBe("sticky");
   const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client+1);
   await page.screenshot({path:testInfo.outputPath("03-mobile-focused.png"),fullPage:true});

@@ -96,6 +96,8 @@ root.innerHTML=`
   </details>
 </main>`;
 
+const lab=root.querySelector(".lab");
+lab.dataset.live="off";
 const mobileTrainingQuery=window.matchMedia("(max-width: 600px)");
 const candleRenderer=new CandleRenderer(root.querySelector("#target-canvas"),{
   pixelRatio:mobileTrainingQuery.matches?1.4:2,
@@ -383,10 +385,15 @@ async function startCameraFlow(){
   primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
   try{
     analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
-    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
     syncRendererMode();
     setupState.textContent=poseReady?"Motion model ready · step into frame":"Camera ready · loading motion model…";
-  }catch(error){setCameraStatus({state:"error",message:error?.message||"Camera failed"});setupState.textContent="Camera permission or device unavailable";cameraStarted=false;}
+  }catch(error){
+    setCameraStatus({state:"error",message:error?.message||"Camera failed"});
+    setupState.textContent="Camera permission or device unavailable";
+    cameraStarted=false;
+    lab.dataset.live="off";
+  }
   updatePrimary();
 }
 function runCalibration(){
@@ -416,7 +423,7 @@ stopCamera.addEventListener("click",()=>{
     calibrationClock.reset();
   }
   poseReadiness.reset();
-  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";
+  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";lab.dataset.live="off";
   syncRendererMode();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
