@@ -2,7 +2,7 @@ import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
-import { MotionTraceRecorder } from "./core/motion-trace.js";
+import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
 import { CandleRenderer } from "./render/candle-renderer.js";
@@ -74,6 +74,8 @@ root.innerHTML=`
       <div class="field-test-actions">
         <button id="trace-toggle" class="secondary-button" type="button">Start motion trace</button>
         <button id="trace-export" class="secondary-button" type="button" disabled>Export JSON</button>
+        <label class="file-button">Import JSON<input id="trace-import" type="file" accept=".json,application/json" /></label>
+        <button id="trace-replay" class="secondary-button" type="button" disabled>Replay analysis</button>
       </div>
       <span id="trace-status">No trace recorded.</span>
     </div>
@@ -99,7 +101,8 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
-const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceStatus=root.querySelector("#trace-status");
+const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceStatus=root.querySelector("#trace-status");
+let importedTrace=null,replayingTrace=false;
 let tracker=null,calibrationTimer=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
@@ -282,6 +285,12 @@ function startRound({simulation=false}={}){
 
 primaryAction.addEventListener("click",()=>{if(!cameraStarted){startCameraFlow();return;}if(!calibrated){runCalibration();return;}if(!round.active)startRound();});
 stopCamera.addEventListener("click",()=>{
+  if(traceRecorder.active){
+    const trace=traceRecorder.stop();
+    traceToggle.textContent="Start motion trace";
+    traceExport.disabled=trace.frameCount===0;
+    traceStatus.textContent=`Camera stopped · trace closed at ${trace.frameCount} frames.`;
+  }
   if(calibrationTimer){clearTimeout(calibrationTimer);calibrationTimer=null;}
   calibrating=false;tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
@@ -314,7 +323,7 @@ traceToggle.addEventListener("click",()=>{
     traceStatus.textContent="Start the camera and wait for the motion model first.";
     return;
   }
-  traceRecorder.start();
+  traceRecorder.start({detectorProfile:analyzer.profile});
   traceToggle.textContent="Stop motion trace";
   traceExport.disabled=true;
   traceStatus.textContent="Recording numeric pose data…";
@@ -336,4 +345,53 @@ traceExport.addEventListener("click",()=>{
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
   traceStatus.textContent=`Exported ${trace.frameCount} numeric frames.`;
+});
+
+traceImport.addEventListener("change",async()=>{
+  const file=traceImport.files?.[0];
+  importedTrace=null;
+  traceReplay.disabled=true;
+  if(!file)return;
+  try{
+    const parsed=JSON.parse(await file.text());
+    const validation=validateMotionTrace(parsed);
+    if(!validation.ok)throw new Error(validation.reason);
+    importedTrace=parsed;
+    traceReplay.disabled=false;
+    traceStatus.textContent=`Loaded ${validation.frameCount} frames for replay.`;
+  }catch(error){
+    traceStatus.textContent=`Import failed · ${error?.message||"invalid JSON"}`;
+  }
+});
+
+traceReplay.addEventListener("click",async()=>{
+  if(!importedTrace||replayingTrace)return;
+  if(cameraStarted){
+    traceStatus.textContent="Stop the live camera before replaying a trace.";
+    return;
+  }
+  replayingTrace=true;
+  traceReplay.disabled=true;
+  analyzer.reset();
+  if(importedTrace.detectorProfile)analyzer.applyProfile(importedTrace.detectorProfile);
+  let strikes=0;
+  traceStatus.textContent="Replaying trace analysis…";
+  try{
+    await replayMotionTrace(importedTrace,{
+      speed:4,
+      onFrame:(frame)=>{
+        const analysis=analyzer.analyze(frame);
+        if(analysis.strike){
+          strikes+=1;
+          processStrike(analysis.strike,{recordHistory:false,haptic:false});
+        }
+      },
+    });
+    traceStatus.textContent=`Replay complete · ${strikes} strike event${strikes===1?"":"s"} detected.`;
+  }catch(error){
+    traceStatus.textContent=`Replay failed · ${error?.message||"unknown error"}`;
+  }finally{
+    replayingTrace=false;
+    traceReplay.disabled=false;
+  }
 });

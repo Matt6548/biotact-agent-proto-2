@@ -41,3 +41,7 @@
   .field-test-body{grid-template-columns:1fr}
   .field-test-actions{justify-content:flex-start}
 }
+
+.file-button{min-height:40px;display:inline-flex;align-items:center;border:1px solid #45483f;border-radius:999px;background:transparent;color:#e8e3d4;padding:0 15px;cursor:pointer;font-size:.82rem}
+.file-button input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.file-button:focus-within{outline:2px solid #e2d9bb;outline-offset:3px}

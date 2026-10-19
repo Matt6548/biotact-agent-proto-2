@@ -3,11 +3,7 @@ const WORLD_INDICES=[15,16];
 
 function compactPoint(point){
   if(!point)return null;
-  const out={
-    x:Number(point.x)||0,
-    y:Number(point.y)||0,
-    z:Number(point.z)||0,
-  };
+  const out={x:Number(point.x)||0,y:Number(point.y)||0,z:Number(point.z)||0};
   if(Number.isFinite(point.visibility))out.v=point.visibility;
   return out;
 }
@@ -59,13 +55,19 @@ export class MotionTraceRecorder{
     this.frames=[];
     this.startedAt=null;
     this.stoppedAt=null;
+    this.detectorProfile=null;
   }
 
-  start(startedAt=Date.now()){
+  start({startedAt=Date.now(),detectorProfile=null}={}){
     this.active=true;
     this.frames=[];
     this.startedAt=startedAt;
     this.stoppedAt=null;
+    this.detectorProfile=detectorProfile?.detector?{
+      baseline:Number(detectorProfile.baseline)||0,
+      peak:Number(detectorProfile.peak)||0,
+      detector:{...detectorProfile.detector},
+    }:null;
   }
 
   add(result){
@@ -89,6 +91,7 @@ export class MotionTraceRecorder{
       createdAt:new Date(this.startedAt||Date.now()).toISOString(),
       stoppedAt:this.stoppedAt?new Date(this.stoppedAt).toISOString():null,
       privacy:"Numeric pose landmarks only. No image, video, audio, name or location.",
+      detectorProfile:this.detectorProfile,
       frameCount:this.frames.length,
       frames:this.frames,
     };
@@ -100,4 +103,23 @@ export function validateMotionTrace(trace){
   if(!Array.isArray(trace.frames)||trace.frames.length===0)return{ok:false,reason:"empty-trace"};
   if(trace.frames.length>5000)return{ok:false,reason:"trace-too-large"};
   return{ok:true,frameCount:trace.frames.length};
+}
+
+export async function replayMotionTrace(trace,{onFrame,speed=4}={}){
+  const validation=validateMotionTrace(trace);
+  if(!validation.ok)throw new Error(validation.reason);
+  if(typeof onFrame!=="function")throw new Error("onFrame callback is required");
+
+  let previousT=null;
+  for(const compact of trace.frames){
+    const currentT=Number(compact.t)||0;
+    if(previousT!==null){
+      const delta=Math.max(0,currentT-previousT);
+      const delay=Number.isFinite(speed)&&speed>0?Math.min(100,delta/speed):0;
+      if(delay>0)await new Promise((resolve)=>setTimeout(resolve,delay));
+    }
+    onFrame(expandPoseFrame(compact));
+    previousT=currentT;
+  }
+  return validation;
 }

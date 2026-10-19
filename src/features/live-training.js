@@ -29,12 +29,19 @@ export class LiveTrainingAnalyzer{
 
   finishCalibration(){
     const profile=this.calibration.finish();
-    if(profile.ok){
-      this.profile=profile;
-      this.detectors.left.configure(profile.detector);
-      this.detectors.right.configure(profile.detector);
-    }
+    if(profile.ok)this.applyProfile(profile);
     return profile;
+  }
+
+  applyProfile(profile){
+    if(!profile?.detector)return false;
+    this.profile=profile;
+    this.detectors.left.configure(profile.detector);
+    this.detectors.right.configure(profile.detector);
+    this.speedFilters.left.reset();
+    this.speedFilters.right.reset();
+    this.previous={left:null,right:null};
+    return true;
   }
 
   analyze({landmarks,worldLandmarks,timestampMs,fps}){
