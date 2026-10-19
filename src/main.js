@@ -194,6 +194,8 @@ function setCameraStatus({state,message}){
     poseReady=true;
     if(cameraStarted&&!calibrating)setupState.textContent="Motion model ready · calibrate next";
     updatePrimary();
+  }else if(state==="privacy-block"){
+    setupState.textContent="External SDK request blocked · training data remains local";
   }else if(state==="error"){
     poseReady=false;
     if(cameraStarted)setupState.textContent="Motion model failed · stop camera and retry";

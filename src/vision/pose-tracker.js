@@ -75,6 +75,11 @@ export class PoseTracker {
       return;
     }
 
+    if (data.type === "egress-blocked") {
+      this.onStatus?.({ state: "privacy-block", message: "Blocked external model request", origin: data.origin });
+      return;
+    }
+
     if (data.type === "detect-error" || data.type === "error") {
       this.frameBusy = false;
       this.onStatus?.({ state: "error", message: data.error });

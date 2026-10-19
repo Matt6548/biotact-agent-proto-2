@@ -5,3 +5,7 @@ test-results/
 .DS_Store
 .env
 *.log
+
+# Generated self-hosted MediaPipe runtime assets
+public/mediapipe/
+public/models/
