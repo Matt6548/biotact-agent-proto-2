@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 17
+## Current checkpoint — Stage 18
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -29,7 +29,8 @@ The active branch is `martial-training-lab`.
 - WebGL failure falls back to a CSS candle target;
 - camera-permission failure returns to a retryable state;
 - mobile uses a lazy mini-target and pauses the full renderer while live;
-- mobile live focus mode hides nonessential page sections while the camera is active.
+- mobile live focus mode hides nonessential page sections while the camera is active;
+- a temporary framing guide helps acquire a stable pose and disappears once readiness is reached.
 
 ### QA
 GitHub Actions runs:

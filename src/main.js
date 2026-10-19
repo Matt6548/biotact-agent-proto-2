@@ -39,6 +39,7 @@ root.innerHTML=`
       <div class="camera-head"><h2>Training view</h2><span class="status-pill" id="camera-status" data-state="idle">Camera off</span></div>
       <div class="camera-stage" id="camera-stage">
         <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
+        <div class="frame-guide" aria-hidden="true"><span>Keep shoulders and hips inside this area</span></div>
         <div id="mini-target-canvas" class="mini-target" aria-hidden="true"></div>
         <div id="hit-feedback" class="hit-feedback" aria-live="polite"></div>
         <div class="camera-empty" id="camera-empty"><strong>Start training when you are ready</strong><span>Then stand 1.5–2.5 m away with shoulders, elbows, wrists and hips visible.</span></div>
@@ -336,6 +337,7 @@ function updateLive(result){
   const analysis=analyzer.analyze(result);
 
   if(!analysis.metrics){
+    cameraCard.dataset.pose="missing";
     poseReadiness.update(false);
     qualityEl.textContent="No pose";
     if(calibrating){
@@ -349,6 +351,7 @@ function updateLive(result){
   }
 
   const readiness=poseReadiness.update(analysis.quality.ok);
+  cameraCard.dataset.pose=readiness.ready?"ready":analysis.quality.ok?"stabilizing":"adjust";
   fpsEl.textContent=String(analysis.metrics.fps);
   leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} m/s`;
   rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} m/s`;
@@ -385,7 +388,7 @@ async function startCameraFlow(){
   primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
   try{
     analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
-    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraCard.dataset.pose="loading";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
     syncRendererMode();
     setupState.textContent=poseReady?"Motion model ready · step into frame":"Camera ready · loading motion model…";
   }catch(error){
@@ -423,7 +426,7 @@ stopCamera.addEventListener("click",()=>{
     calibrationClock.reset();
   }
   poseReadiness.reset();
-  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";lab.dataset.live="off";
+  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
   syncRendererMode();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";

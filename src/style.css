@@ -101,3 +101,68 @@
     border-radius:14px;
   }
 }
+
+
+/* Stage 18 — pose framing guide + mobile live cleanup */
+.frame-guide{
+  display:none;
+  position:absolute;
+  inset:8% 18% 10%;
+  z-index:3;
+  pointer-events:none;
+  border:1px solid rgba(224,220,207,.18);
+  border-radius:34% 34% 18% 18% / 18% 18% 12% 12%;
+  box-shadow:
+    inset 2px 0 0 rgba(238,231,209,.44),
+    inset -2px 0 0 rgba(238,231,209,.44);
+}
+.frame-guide::before,.frame-guide::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  transform:translateX(-50%);
+  width:42%;
+  border-top:1px solid rgba(238,231,209,.22);
+}
+.frame-guide::before{top:24%}
+.frame-guide::after{top:58%}
+.frame-guide span{
+  position:absolute;
+  left:50%;
+  bottom:4%;
+  transform:translateX(-50%);
+  width:max-content;
+  max-width:92%;
+  padding:6px 9px;
+  border-radius:999px;
+  background:rgba(15,16,14,.72);
+  color:#d8d4c7;
+  font-size:.72rem;
+  text-align:center;
+  white-space:nowrap;
+}
+.camera-card[data-camera="on"][data-pose="missing"] .frame-guide,
+.camera-card[data-camera="on"][data-pose="adjust"] .frame-guide,
+.camera-card[data-camera="on"][data-pose="stabilizing"] .frame-guide{
+  display:block;
+}
+.camera-card[data-pose="stabilizing"] .frame-guide{
+  border-color:rgba(215,218,199,.34);
+}
+@media(max-width:600px){
+  .lab[data-live="on"] .status-pill[data-state="ready"]{display:none}
+  .lab[data-live="on"] .camera-head{min-height:38px}
+  .lab[data-live="on"] .setup-line>div{min-width:0;flex:1}
+  .lab[data-live="on"] .setup-line .text-button{
+    flex:0 0 auto;
+    white-space:nowrap;
+    font-size:.78rem;
+    padding-left:10px;
+  }
+  .lab[data-live="on"] .frame-guide{
+    inset:7% 16% 9%;
+  }
+  .lab[data-live="on"] .frame-guide span{
+    font-size:.68rem;
+  }
+}

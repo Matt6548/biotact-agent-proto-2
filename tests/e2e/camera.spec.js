@@ -34,6 +34,16 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
     await expect(page.locator(".field-test")).toBeHidden();
     await expect(page.locator(".simulation")).toBeHidden();
     await expect(page.locator(".camera-card")).toBeVisible();
+    await expect(page.locator(".frame-guide")).toBeVisible();
+    await expect(page.locator("#camera-status")).toBeHidden();
+
+    const stopWrap=await page.getByRole("button",{name:"Stop camera"}).evaluate((el)=>({
+      scrollWidth:el.scrollWidth,
+      clientWidth:el.clientWidth,
+      whiteSpace:getComputedStyle(el).whiteSpace
+    }));
+    expect(stopWrap.whiteSpace).toBe("nowrap");
+    expect(stopWrap.scrollWidth).toBeLessThanOrEqual(stopWrap.clientWidth+1);
 
     await page.screenshot({
       path:testInfo.outputPath("04-mobile-live-focus.png"),
