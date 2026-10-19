@@ -59,6 +59,7 @@ test("poor framing blocks strike emission even when wrist motion is fast",()=>{
   const xs=[0,0,0,.08,.16,.24,.32,.40,.40,.40,.40];
   xs.forEach((x,index)=>{
     const f=poseFrame({t:index*33,wristX:x});
+    f.landmarks[11]={x:1.02,y:.5,z:0,visibility:.96};
     f.landmarks[23]={x:1.02,y:.5,z:0,visibility:.96};
     f.landmarks[24]={x:1.02,y:.5,z:0,visibility:.96};
     const result=analyzer.analyze(f);
