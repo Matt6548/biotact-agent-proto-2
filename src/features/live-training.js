@@ -1,64 +1,75 @@
+import { SpeedCalibration } from "../core/calibration.js";
 import { averageVisibility, inFrameRatio, qualityGate, velocityBetween } from "../core/motion-model.js";
 import { StrikeDetector } from "../core/strike-detector.js";
 
-const KEY = {
-  leftShoulder: 11,
-  rightShoulder: 12,
-  leftElbow: 13,
-  rightElbow: 14,
-  leftWrist: 15,
-  rightWrist: 16,
-  leftHip: 23,
-  rightHip: 24,
-};
+const KEY={leftShoulder:11,rightShoulder:12,leftElbow:13,rightElbow:14,leftWrist:15,rightWrist:16,leftHip:23,rightHip:24};
+const ESSENTIAL=Object.values(KEY);
 
-const ESSENTIAL = Object.values(KEY);
-
-export class LiveTrainingAnalyzer {
-  constructor() {
-    this.detectors = { left: new StrikeDetector(), right: new StrikeDetector() };
-    this.previous = { left: null, right: null };
+export class LiveTrainingAnalyzer{
+  constructor(){
+    this.detectors={left:new StrikeDetector(),right:new StrikeDetector()};
+    this.previous={left:null,right:null};
+    this.calibration=new SpeedCalibration();
+    this.profile=null;
   }
 
-  reset() {
+  reset(){
     this.detectors.left.reset();
     this.detectors.right.reset();
-    this.previous = { left: null, right: null };
+    this.previous={left:null,right:null};
   }
 
-  analyze({ landmarks, worldLandmarks, timestampMs, fps }) {
-    if (!landmarks || !worldLandmarks) {
-      return { quality: { ok: false, reasons: ["no-pose"] }, metrics: null, strike: null };
+  startCalibration(){
+    this.reset();
+    this.calibration.start();
+  }
+
+  finishCalibration(){
+    const profile=this.calibration.finish();
+    if(profile.ok){
+      this.profile=profile;
+      this.detectors.left.configure(profile.detector);
+      this.detectors.right.configure(profile.detector);
+    }
+    return profile;
+  }
+
+  analyze({landmarks,worldLandmarks,timestampMs,fps}){
+    if(!landmarks||!worldLandmarks){
+      return{quality:{ok:false,reasons:["no-pose"]},metrics:null,strike:null,calibrating:this.calibration.active};
     }
 
-    const visibility = averageVisibility(landmarks, ESSENTIAL);
-    const bodyCoverage = inFrameRatio(landmarks, ESSENTIAL);
-    const quality = qualityGate({ visibility, fps, bodyCoverage });
+    const visibility=averageVisibility(landmarks,ESSENTIAL);
+    const bodyCoverage=inFrameRatio(landmarks,ESSENTIAL);
+    const quality=qualityGate({visibility,fps,bodyCoverage});
 
-    const leftPoint = { ...worldLandmarks[KEY.leftWrist], t: timestampMs };
-    const rightPoint = { ...worldLandmarks[KEY.rightWrist], t: timestampMs };
-    const leftSpeed = velocityBetween(this.previous.left, leftPoint);
-    const rightSpeed = velocityBetween(this.previous.right, rightPoint);
+    const leftPoint={...worldLandmarks[KEY.leftWrist],t:timestampMs};
+    const rightPoint={...worldLandmarks[KEY.rightWrist],t:timestampMs};
+    const leftSpeed=velocityBetween(this.previous.left,leftPoint);
+    const rightSpeed=velocityBetween(this.previous.right,rightPoint);
+    const maxWristSpeed=Math.max(leftSpeed,rightSpeed);
 
-    const leftStrike = this.detectors.left.update({ t: timestampMs, speed: leftSpeed, point: leftPoint });
-    const rightStrike = this.detectors.right.update({ t: timestampMs, speed: rightSpeed, point: rightPoint });
+    if(this.calibration.active&&visibility>=0.65&&bodyCoverage>=0.6){
+      this.calibration.add(maxWristSpeed);
+    }
 
-    this.previous.left = leftPoint;
-    this.previous.right = rightPoint;
+    const leftStrike=this.calibration.active?null:this.detectors.left.update({t:timestampMs,speed:leftSpeed,point:leftPoint});
+    const rightStrike=this.calibration.active?null:this.detectors.right.update({t:timestampMs,speed:rightSpeed,point:rightPoint});
 
-    const strike = !quality.ok
-      ? null
-      : [
-          leftStrike && { ...leftStrike, hand: "left" },
-          rightStrike && { ...rightStrike, hand: "right" },
-        ]
-          .filter(Boolean)
-          .sort((a, b) => b.peakSpeed - a.peakSpeed)[0] ?? null;
+    this.previous.left=leftPoint;
+    this.previous.right=rightPoint;
 
-    return {
+    const strike=!quality.ok||this.calibration.active?null:[
+      leftStrike&&{...leftStrike,hand:"left"},
+      rightStrike&&{...rightStrike,hand:"right"},
+    ].filter(Boolean).sort((a,b)=>b.peakSpeed-a.peakSpeed)[0]??null;
+
+    return{
       quality,
-      metrics: { visibility, bodyCoverage, fps, leftWristSpeed: leftSpeed, rightWristSpeed: rightSpeed },
+      metrics:{visibility,bodyCoverage,fps,leftWristSpeed:leftSpeed,rightWristSpeed:rightSpeed,maxWristSpeed},
       strike,
+      calibrating:this.calibration.active,
+      profile:this.profile,
     };
   }
 }

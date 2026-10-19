@@ -13,6 +13,11 @@ export class StrikeDetector {
     this.reset();
   }
 
+  configure(overrides = {}) {
+    Object.assign(this.config, overrides);
+    this.reset();
+  }
+
   reset() {
     this.active = false;
     this.startedAt = 0;
