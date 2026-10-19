@@ -82,6 +82,7 @@ test("tracking loss breaks an in-progress strike trajectory",()=>{
   const lost=poseFrame({t:165,wristX:.24});
   lost.landmarks[11].visibility=.1;
   lost.landmarks[12].visibility=.1;
+  lost.landmarks[23].visibility=.1;
   const lostResult=analyzer.analyze(lost);
   assert.equal(lostResult.trackingReset,true);
 
