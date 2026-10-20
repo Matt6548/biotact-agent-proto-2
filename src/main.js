@@ -3,6 +3,7 @@ import { buildCoachFeedback } from "./core/coach.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
+import { DeviceDiagnostics } from "./core/device-diagnostics.js";
 import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
@@ -17,6 +18,7 @@ const round=new TrainingRound({attemptLimit:5});
 const traceRecorder=new MotionTraceRecorder({maxFrames:900});
 const poseReadiness=new StableReadiness({requiredConsecutive:6});
 const calibrationClock=new ValidDurationGate({requiredMs:5000,maxStepMs:100});
+const deviceDiagnostics=new DeviceDiagnostics({maxSamples:300,minSamples:30});
 const root=document.querySelector("#app");
 const HISTORY_KEY="martial-training-lab.attempts.v1";
 
@@ -45,7 +47,7 @@ root.innerHTML=`
         <div class="camera-empty" id="camera-empty"><strong>Start training when you are ready</strong><span>Then stand 1.5–2.5 m away with shoulders, elbows, wrists and hips visible.</span></div>
       </div>
       <div class="setup-line"><div><span>Setup</span><strong id="setup-state">Camera not started</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Stop camera</button></div>
-      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div></details>
+      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div><div class="device-readiness-line"><span>Device readiness</span><strong id="device-readiness">Collecting…</strong><small>Engineering estimate from runtime FPS and inference latency; not a training or medical score.</small></div></details>
       <p class="camera-note">Use comfortable straight punches for calibration, not maximum effort. Keep real open flames away from the training area.</p>
     </article>
 
@@ -82,6 +84,7 @@ root.innerHTML=`
         <label class="file-button">Import JSON<input id="trace-import" type="file" accept=".json,application/json" /></label>
         <button id="trace-replay" class="secondary-button" type="button" disabled>Replay analysis</button>
         <button id="trace-clear" class="secondary-button" type="button" disabled>Clear trace</button>
+        <button id="device-report-export" class="secondary-button" type="button" disabled>Export device report</button>
       </div>
       <span id="trace-status">No trace recorded.</span>
     </div>
@@ -109,11 +112,11 @@ const miniTargetContainer=root.querySelector("#mini-target-canvas");
 const video=root.querySelector("#camera"),overlay=root.querySelector("#pose-overlay"),ctx=overlay.getContext("2d");
 const cameraCard=root.querySelector("#camera-card"),cameraEmpty=root.querySelector("#camera-empty");
 const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelector("#camera-status"),setupState=root.querySelector("#setup-state"),primaryAction=root.querySelector("#primary-action");
-const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
+const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),deviceReadinessEl=root.querySelector("#device-readiness"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
-const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),traceStatus=root.querySelector("#trace-status");
+const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
 let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 
@@ -333,6 +336,11 @@ function updateLive(result){
     if(result.diagnostics.delegate)modelBackendEl.textContent=result.diagnostics.delegate;
     inferenceEl.textContent=Number.isFinite(result.diagnostics.inferenceMs)?`${Math.round(result.diagnostics.inferenceMs)} ms`:"—";
     busySkipsEl.textContent=Number.isFinite(result.diagnostics.busySkipsPerSecond)?String(result.diagnostics.busySkipsPerSecond):"—";
+    const deviceReport=deviceDiagnostics.add({fps:result.fps,...result.diagnostics});
+    const labels={insufficient:"Collecting…",ready:"Ready",constrained:"Constrained",limited:"Limited"};
+    deviceReadinessEl.textContent=labels[deviceReport.status]||"Collecting…";
+    deviceReadinessEl.dataset.state=deviceReport.status;
+    deviceReportExport.disabled=deviceReport.status==="insufficient";
   }
   if(traceRecorder.active){
     traceRecorder.add(result);
@@ -395,6 +403,10 @@ function updateLive(result){
 }
 
 async function startCameraFlow(){
+  deviceDiagnostics.reset();
+  deviceReadinessEl.textContent="Collecting…";
+  deviceReadinessEl.dataset.state="insufficient";
+  deviceReportExport.disabled=true;
   primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
   try{
     analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
@@ -477,6 +489,24 @@ traceToggle.addEventListener("click",()=>{
   traceToggle.textContent="Stop motion trace";
   traceExport.disabled=true;
   traceStatus.textContent="Recording numeric pose data…";
+});
+
+deviceReportExport.addEventListener("click",()=>{
+  const report=deviceDiagnostics.report();
+  if(report.status==="insufficient"){
+    traceStatus.textContent="Device report needs a little more live camera data.";
+    return;
+  }
+  const blob=new Blob([JSON.stringify(report,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`candle-strike-device-report-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  traceStatus.textContent=`Exported device performance report · ${report.status} · ${report.sampleCount} samples.`;
 });
 
 traceExport.addEventListener("click",()=>{
