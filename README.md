@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 23.2
+## Current checkpoint — Stage 24
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -53,6 +53,9 @@ Run `CHECK_TRAINING.cmd` for a quick unit/build/runtime check before a demo.
 
 ## Portable demo
 Every successful CI run now publishes a `martial-training-windows-demo` artifact. It contains the already-built app, local MediaPipe model/WASM and a one-click `OPEN_DEMO.cmd` launcher. Runtime requires Python 3 only; no Node/npm is needed for the packaged demo.
+
+## Deployment readiness
+A separate Vercel configuration is now committed for a new Martial Training HTTPS deployment. It keeps the same production security headers as the verified local server. The existing GitHub Pages site remains the legacy Biotact app and is intentionally untouched.
 
 ## Main remaining blocker
 Real HTTPS device testing with actual human movement is still required. Automated fake-camera tests prove runtime/privacy/recovery behavior, not punch-recognition quality in real lighting, clothing, camera angles, or devices.

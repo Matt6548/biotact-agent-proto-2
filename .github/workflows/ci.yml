@@ -36,6 +36,9 @@ jobs:
       - name: Launch-pack runtime check
         run: npm run launch:check
 
+      - name: Deployment config parity
+        run: node scripts/check-deployment-security.mjs
+
       - name: Verify portable demo server headers
         shell: bash
         run: |
