@@ -21,7 +21,7 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
   await expect(page.locator("#busy-skips")).toHaveText(/^\d+$/);
   await expect(page.locator("#device-readiness")).toHaveText(/Ready|Constrained|Limited/,{timeout:20000});
-  await expect(page.getByRole("button",{name:"Export device report"})).toBeEnabled();
+  await expect(page.locator("#device-report-export")).toBeEnabled();
 
   expect(external).toEqual([]);
 
