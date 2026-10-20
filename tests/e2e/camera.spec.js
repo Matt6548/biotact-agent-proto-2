@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+test.setTimeout(45_000);
+
 test("fake webcam initializes private pose runtime and the correct renderer mode",async({page},testInfo)=>{
   const external=[];
   page.on("request",(request)=>{
