@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 23
+## Current checkpoint — Stage 23.1
 The active branch is `martial-training-lab`.
 
 ### Training loop

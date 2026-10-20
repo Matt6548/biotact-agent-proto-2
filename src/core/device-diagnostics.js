@@ -12,20 +12,27 @@ export function percentile(values=[],q=.5){
 }
 
 export class DeviceDiagnostics{
-  constructor({maxSamples=300,minSamples=30}={}){
+  constructor({maxSamples=300,minSamples=10,minWindowMs=1500}={}){
     this.maxSamples=Math.max(30,Math.floor(maxSamples));
-    this.minSamples=Math.max(10,Math.floor(minSamples));
+    this.minSamples=Math.max(5,Math.floor(minSamples));
+    this.minWindowMs=Math.max(500,Math.floor(minWindowMs));
     this.reset();
   }
 
   reset(){
     this.samples=[];
     this.delegate=null;
+    this.firstTimestampMs=null;
+    this.lastTimestampMs=null;
   }
 
-  add({fps,inferenceMs,busySkipsPerSecond,delegate}={}){
+  add({fps,inferenceMs,busySkipsPerSecond,delegate,timestampMs}={}){
     if(delegate)this.delegate=String(delegate);
     if(!Number.isFinite(fps)||!Number.isFinite(inferenceMs))return this.report();
+    if(Number.isFinite(timestampMs)){
+      if(this.firstTimestampMs===null)this.firstTimestampMs=timestampMs;
+      this.lastTimestampMs=timestampMs;
+    }
     this.samples.push({
       fps,
       inferenceMs,
@@ -46,8 +53,13 @@ export class DeviceDiagnostics{
     const medianBusySkipsPerSecond=percentile(skips,.5);
     const maxBusySkipsPerSecond=skips.length?Math.max(...skips):null;
 
+    const observedWindowMs=
+      this.firstTimestampMs!==null&&this.lastTimestampMs!==null
+        ?Math.max(0,this.lastTimestampMs-this.firstTimestampMs)
+        :0;
+
     let status="insufficient";
-    if(this.samples.length>=this.minSamples){
+    if(this.samples.length>=this.minSamples&&observedWindowMs>=this.minWindowMs){
       if((medianFps??0)>=20&&(p90InferenceMs??Infinity)<=50)status="ready";
       else if((medianFps??0)>=15&&(p90InferenceMs??Infinity)<=80)status="constrained";
       else status="limited";
@@ -57,6 +69,7 @@ export class DeviceDiagnostics{
       schemaVersion:1,
       kind:"martial-training-device-performance",
       sampleCount:this.samples.length,
+      observedWindowMs:Math.round(observedWindowMs),
       delegate:this.delegate,
       status,
       metrics:{
@@ -72,6 +85,8 @@ export class DeviceDiagnostics{
         readyP90InferenceMs:50,
         constrainedMinimumFps:15,
         constrainedP90InferenceMs:80,
+        minimumSamples:this.minSamples,
+        minimumObservationWindowMs:this.minWindowMs,
       },
       privacy:{
         containsBodyCoordinates:false,

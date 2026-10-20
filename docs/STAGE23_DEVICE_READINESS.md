@@ -22,9 +22,9 @@ The status is an engineering estimate, not a biomechanical, medical or fitness s
 - **Ready**: median processed FPS >= 20 and p90 inference <= 50 ms.
 - **Constrained**: median FPS >= 15 and p90 inference <= 80 ms.
 - **Limited**: below those bounds.
-- **Collecting**: fewer than 30 valid performance samples.
+- **Collecting**: until at least 10 valid samples span at least 1.5 seconds.
 
-The 20 FPS reference matches the application's existing tracking quality gate. The inference boundaries are product engineering budgets for this runtime, not scientific claims about human motion.
+The 20 FPS reference matches the application's existing tracking quality gate. The inference boundaries are product engineering budgets for this runtime, not scientific claims about human motion. Readiness requires both sample count and elapsed observation time so slow devices are not penalized by a fixed-frame threshold.
 
 ## UX
 The main training surface is unchanged. Device readiness lives only inside `Tracking details`.

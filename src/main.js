@@ -18,7 +18,7 @@ const round=new TrainingRound({attemptLimit:5});
 const traceRecorder=new MotionTraceRecorder({maxFrames:900});
 const poseReadiness=new StableReadiness({requiredConsecutive:6});
 const calibrationClock=new ValidDurationGate({requiredMs:5000,maxStepMs:100});
-const deviceDiagnostics=new DeviceDiagnostics({maxSamples:300,minSamples:30});
+const deviceDiagnostics=new DeviceDiagnostics({maxSamples:300,minSamples:10,minWindowMs:1500});
 const root=document.querySelector("#app");
 const HISTORY_KEY="martial-training-lab.attempts.v1";
 
@@ -336,7 +336,7 @@ function updateLive(result){
     if(result.diagnostics.delegate)modelBackendEl.textContent=result.diagnostics.delegate;
     inferenceEl.textContent=Number.isFinite(result.diagnostics.inferenceMs)?`${Math.round(result.diagnostics.inferenceMs)} ms`:"—";
     busySkipsEl.textContent=Number.isFinite(result.diagnostics.busySkipsPerSecond)?String(result.diagnostics.busySkipsPerSecond):"—";
-    const deviceReport=deviceDiagnostics.add({fps:result.fps,...result.diagnostics});
+    const deviceReport=deviceDiagnostics.add({fps:result.fps,timestampMs:result.timestampMs,...result.diagnostics});
     const labels={insufficient:"Collecting…",ready:"Ready",constrained:"Constrained",limited:"Limited"};
     deviceReadinessEl.textContent=labels[deviceReport.status]||"Collecting…";
     deviceReadinessEl.dataset.state=deviceReport.status;
