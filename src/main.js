@@ -1,6 +1,7 @@
 import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
 import { buildRoundInsight } from "./core/round-insight.js";
+import { TrainingSessionReview } from "./core/session-review.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
@@ -18,6 +19,7 @@ const session=new CandleTrainingSession();
 const analyzer=new LiveTrainingAnalyzer();
 const progression=new TrainingProgression();
 const round=new TrainingRound({attemptLimit:5});
+const trainingSessionReview=new TrainingSessionReview();
 const traceRecorder=new MotionTraceRecorder({maxFrames:900});
 const poseReadiness=new StableReadiness({requiredConsecutive:6});
 const calibrationClock=new ValidDurationGate({requiredMs:5000,maxStepMs:100});
@@ -136,6 +138,13 @@ root.innerHTML=`
     </div>
   </section>
 
+  <section class="session-review" id="session-review" hidden aria-live="polite">
+    <div><span>Session rounds</span><strong id="session-rounds">0</strong><small id="session-hits">0 target hits</small></div>
+    <div><span>Average score</span><strong id="session-score">—</strong><small>across completed rounds</small></div>
+    <div><span>Avg repeatability</span><strong id="session-repeatability">—</strong><small>engineering training index</small></div>
+    <div class="session-focus"><span>Session focus</span><strong id="session-focus">Repeatability</strong><small id="session-focus-cue">Build a repeatable pattern before increasing difficulty.</small></div>
+  </section>
+
   <details class="history-card"><summary>Recent attempts <span id="history-count">0</span></summary><div class="history-head"><span>Stored only in this browser</span><button class="text-button" id="clear-history" type="button">Clear</button></div><ol id="history" class="history-list"></ol></details>
 
   <details class="field-test">
@@ -192,7 +201,7 @@ const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelec
 const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),deviceReadinessEl=root.querySelector("#device-readiness"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
-const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),roundInsight=root.querySelector("#round-insight"),summaryConsistency=root.querySelector("#summary-consistency"),summaryConsistencyDetail=root.querySelector("#summary-consistency-detail"),summaryDrill=root.querySelector("#summary-drill"),summaryDrillCue=root.querySelector("#summary-drill-cue"),hitFeedback=root.querySelector("#hit-feedback");
+const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),roundInsight=root.querySelector("#round-insight"),summaryConsistency=root.querySelector("#summary-consistency"),summaryConsistencyDetail=root.querySelector("#summary-consistency-detail"),summaryDrill=root.querySelector("#summary-drill"),summaryDrillCue=root.querySelector("#summary-drill-cue"),sessionReviewEl=root.querySelector("#session-review"),sessionRoundsEl=root.querySelector("#session-rounds"),sessionHitsEl=root.querySelector("#session-hits"),sessionScoreEl=root.querySelector("#session-score"),sessionRepeatabilityEl=root.querySelector("#session-repeatability"),sessionFocusEl=root.querySelector("#session-focus"),sessionFocusCueEl=root.querySelector("#session-focus-cue"),hitFeedback=root.querySelector("#hit-feedback");
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
 let localPlayer=readLocalPlayer();
@@ -325,6 +334,16 @@ function updatePrimary(){
   else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
   else primaryAction.textContent="Start 5-strike round";
 }
+function renderSessionReview(summary=trainingSessionReview.snapshot()){
+  sessionReviewEl.hidden=summary.roundsCompleted===0;
+  sessionRoundsEl.textContent=String(summary.roundsCompleted);
+  sessionHitsEl.textContent=`${summary.targetHits} target hit${summary.targetHits===1?"":"s"} · ${summary.totalAttempts} strikes`;
+  sessionScoreEl.textContent=summary.roundsCompleted?String(summary.averageScore):"—";
+  sessionRepeatabilityEl.textContent=Number.isFinite(summary.averageRepeatability)?`${summary.averageRepeatability}/100`:"—";
+  sessionFocusEl.textContent=summary.focus.title;
+  sessionFocusCueEl.textContent=summary.focus.cue;
+}
+
 function updateRound(snapshot=round.snapshot()){
   roundCount.textContent=`${snapshot.attempts} / ${snapshot.attemptLimit}`;
   roundSuccess.textContent=`${Math.min(snapshot.successes,progression.requiredSuccesses)} / ${progression.requiredSuccesses}`;
@@ -346,7 +365,7 @@ function updateRound(snapshot=round.snapshot()){
   updateLevel();updatePrimary();
 }
 if(localPlayer?.name)playerDisplay.textContent=localPlayer.name;
-renderHistory();updateLevel();updateRound();updatePrimary();
+renderHistory();updateLevel();updateRound();renderSessionReview();updatePrimary();
 
 function saveAttempt(strike,result,level,intensity){
   attempts.unshift({
@@ -447,6 +466,13 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
 
     if(roundState.complete){
       const completed=progression.completeRound({successes:roundState.successes});
+      const insight=buildRoundInsight(round.attempts);
+      const sessionSummary=trainingSessionReview.recordRound({
+        levelId:completed.completedLevel.id,
+        roundSummary:roundState,
+        insight,
+      });
+      renderSessionReview(sessionSummary);
       lastRoundOutcome=completed;
       roundLevel=null;
       updateLevel();updatePrimary();
@@ -549,6 +575,8 @@ function updateLive(result){
 }
 
 async function startCameraFlow(){
+  trainingSessionReview.reset();
+  renderSessionReview();
   deviceDiagnostics.reset();
   deviceReadinessEl.textContent="Collecting…";
   deviceReadinessEl.dataset.state="insufficient";

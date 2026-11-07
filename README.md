@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 27
+## Current checkpoint — Stage 28
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -12,7 +12,8 @@ The active branch is `martial-training-lab`.
 - deterministic candle/flame scoring and concise measured coaching;
 - personal-reference strike intensity rather than raw camera speed for gameplay;
 - local recent-attempt history;
-- post-round repeatability insight and one focused candle drill based on line control, normalized intensity spread and target-hit consistency.
+- post-round repeatability insight and one focused candle drill based on line control, normalized intensity spread and target-hit consistency;
+- in-session review across completed candle rounds: average score, average repeatability, target hits and one dominant training focus.
 
 ### Vision / privacy
 - MediaPipe Pose Landmarker runs in a Web Worker;
