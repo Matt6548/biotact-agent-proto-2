@@ -39,27 +39,47 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   const mode=await page.locator("#camera-card").getAttribute("data-renderer-mode");
   if(testInfo.project.name==="camera-mobile-chromium"){
     expect(mode).toBe("mini");
-    await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(1);
+    const focusState=await page.evaluate(()=>{
+      const state=(selector)=>{
+        const el=document.querySelector(selector);
+        if(!el)return{exists:false,display:null,visibility:null};
+        const style=getComputedStyle(el);
+        return{exists:true,display:style.display,visibility:style.visibility};
+      };
+      const stop=document.querySelector("#stop-camera");
+      return{
+        miniCanvasCount:document.querySelectorAll("#mini-target-canvas canvas").length,
+        arenaPosition:getComputedStyle(document.querySelector(".arena-status")).position,
+        hero:state(".hero"),
+        target:state(".target-card"),
+        history:state(".history-card"),
+        fieldTest:state(".field-test"),
+        simulation:state(".simulation"),
+        camera:state(".camera-card"),
+        frameGuide:state(".frame-guide"),
+        cameraStatus:state("#camera-status"),
+        stop:{
+          scrollWidth:stop?.scrollWidth??0,
+          clientWidth:stop?.clientWidth??0,
+          whiteSpace:stop?getComputedStyle(stop).whiteSpace:null,
+        },
+      };
+    });
 
-    const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
-    expect(arenaPosition).toBe("sticky");
-
-    await expect(page.locator(".hero")).toBeHidden();
-    await expect(page.locator(".target-card")).toBeHidden();
-    await expect(page.locator(".history-card")).toBeHidden();
-    await expect(page.locator(".field-test")).toBeHidden();
-    await expect(page.locator(".simulation")).toBeHidden();
-    await expect(page.locator(".camera-card")).toBeVisible();
-    await expect(page.locator(".frame-guide")).toBeVisible();
-    await expect(page.locator("#camera-status")).toBeHidden();
-
-    const stopWrap=await page.getByRole("button",{name:"Stop camera"}).evaluate((el)=>({
-      scrollWidth:el.scrollWidth,
-      clientWidth:el.clientWidth,
-      whiteSpace:getComputedStyle(el).whiteSpace
-    }));
-    expect(stopWrap.whiteSpace).toBe("nowrap");
-    expect(stopWrap.scrollWidth).toBeLessThanOrEqual(stopWrap.clientWidth+1);
+    expect(focusState.miniCanvasCount).toBe(1);
+    expect(focusState.arenaPosition).toBe("sticky");
+    for(const key of["hero","target","history","fieldTest","simulation"]){
+      expect(focusState[key].exists).toBe(true);
+      expect(focusState[key].display).toBe("none");
+    }
+    expect(focusState.camera.exists).toBe(true);
+    expect(focusState.camera.display).not.toBe("none");
+    expect(focusState.frameGuide.exists).toBe(true);
+    expect(focusState.frameGuide.display).not.toBe("none");
+    expect(focusState.cameraStatus.exists).toBe(true);
+    expect(focusState.cameraStatus.display).toBe("none");
+    expect(focusState.stop.whiteSpace).toBe("nowrap");
+    expect(focusState.stop.scrollWidth).toBeLessThanOrEqual(focusState.stop.clientWidth+1);
 
     await page.screenshot({
       path:testInfo.outputPath("04-mobile-live-focus.png")
