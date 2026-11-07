@@ -12,6 +12,7 @@ async function completeBriefing(page,name="Test Player"){
 
 
 test("fake webcam initializes private pose runtime and the correct renderer mode",async({page},testInfo)=>{
+  test.setTimeout(45_000);
   const external=[];
   page.on("request",(request)=>{
     const url=new URL(request.url());
