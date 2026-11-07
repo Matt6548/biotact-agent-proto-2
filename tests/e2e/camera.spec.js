@@ -62,8 +62,7 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
     expect(stopWrap.scrollWidth).toBeLessThanOrEqual(stopWrap.clientWidth+1);
 
     await page.screenshot({
-      path:testInfo.outputPath("04-mobile-live-focus.png"),
-      fullPage:true
+      path:testInfo.outputPath("04-mobile-live-focus.png")
     });
   }else{
     expect(mode).toBe("full");
