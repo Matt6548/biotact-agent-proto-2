@@ -2,6 +2,7 @@ import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
 import { buildRoundInsight } from "./core/round-insight.js";
 import { TrainingSessionReview } from "./core/session-review.js";
+import { buildFieldTestPack } from "./core/field-test-pack.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
@@ -161,8 +162,10 @@ root.innerHTML=`
         <button id="trace-replay" class="secondary-button" type="button" disabled>Replay analysis</button>
         <button id="trace-clear" class="secondary-button" type="button" disabled>Clear trace</button>
         <button id="device-report-export" class="secondary-button" type="button" disabled>Export device report</button>
+        <button id="field-pack-export" class="secondary-button" type="button" disabled>Export field-test pack</button>
       </div>
       <span id="trace-status">No trace recorded.</span>
+      <small class="field-pack-note">Field-test pack = the motion trace you explicitly record + aggregate device performance + latest completed candle round. It never adds player name, account, image, video or audio.</small>
     </div>
   </details>
 
@@ -202,8 +205,8 @@ const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),roundInsight=root.querySelector("#round-insight"),summaryConsistency=root.querySelector("#summary-consistency"),summaryConsistencyDetail=root.querySelector("#summary-consistency-detail"),summaryDrill=root.querySelector("#summary-drill"),summaryDrillCue=root.querySelector("#summary-drill-cue"),sessionReviewEl=root.querySelector("#session-review"),sessionRoundsEl=root.querySelector("#session-rounds"),sessionHitsEl=root.querySelector("#session-hits"),sessionScoreEl=root.querySelector("#session-score"),sessionRepeatabilityEl=root.querySelector("#session-repeatability"),sessionFocusEl=root.querySelector("#session-focus"),sessionFocusCueEl=root.querySelector("#session-focus-cue"),hitFeedback=root.querySelector("#hit-feedback");
-const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),traceStatus=root.querySelector("#trace-status");
-let importedTrace=null,replayingTrace=false;
+const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),fieldPackExport=root.querySelector("#field-pack-export"),traceStatus=root.querySelector("#trace-status");
+let importedTrace=null,replayingTrace=false,lastFieldRoundEvidence=null;
 let localPlayer=readLocalPlayer();
 let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 
@@ -334,6 +337,12 @@ function updatePrimary(){
   else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
   else primaryAction.textContent="Start 5-strike round";
 }
+function syncFieldPackButton(){
+  const trace=traceRecorder.export();
+  const report=deviceDiagnostics.report();
+  fieldPackExport.disabled=traceRecorder.active||trace.frameCount===0||report.status==="insufficient"||!lastFieldRoundEvidence;
+}
+
 function renderSessionReview(summary=trainingSessionReview.snapshot()){
   sessionReviewEl.hidden=summary.roundsCompleted===0;
   sessionRoundsEl.textContent=String(summary.roundsCompleted);
@@ -365,7 +374,7 @@ function updateRound(snapshot=round.snapshot()){
   updateLevel();updatePrimary();
 }
 if(localPlayer?.name)playerDisplay.textContent=localPlayer.name;
-renderHistory();updateLevel();updateRound();renderSessionReview();updatePrimary();
+renderHistory();updateLevel();updateRound();renderSessionReview();syncFieldPackButton();updatePrimary();
 
 function saveAttempt(strike,result,level,intensity){
   attempts.unshift({
@@ -472,6 +481,18 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
         roundSummary:roundState,
         insight,
       });
+      lastFieldRoundEvidence={
+        levelId:completed.completedLevel.id,
+        levelName:completed.completedLevel.name,
+        attempts:roundState.attempts,
+        successes:roundState.successes,
+        averageScore:roundState.averageScore,
+        bestIntensityRatio:roundState.bestIntensityRatio,
+        bestStraightness:roundState.bestStraightness,
+        repeatabilityIndex:insight.repeatabilityIndex,
+        limiter:insight.limiter,
+      };
+      syncFieldPackButton();
       renderSessionReview(sessionSummary);
       lastRoundOutcome=completed;
       roundLevel=null;
@@ -513,6 +534,7 @@ function updateLive(result){
     deviceReadinessEl.textContent=labels[deviceReport.status]||"Collecting…";
     deviceReadinessEl.dataset.state=deviceReport.status;
     deviceReportExport.disabled=deviceReport.status==="insufficient";
+    syncFieldPackButton();
   }
   if(traceRecorder.active){
     traceRecorder.add(result);
@@ -576,7 +598,9 @@ function updateLive(result){
 
 async function startCameraFlow(){
   trainingSessionReview.reset();
+  lastFieldRoundEvidence=null;
   renderSessionReview();
+  syncFieldPackButton();
   deviceDiagnostics.reset();
   deviceReadinessEl.textContent="Collecting…";
   deviceReadinessEl.dataset.state="insufficient";
@@ -650,6 +674,7 @@ traceToggle.addEventListener("click",()=>{
     traceExport.disabled=trace.frameCount===0;
     traceClear.disabled=trace.frameCount===0;
     traceStatus.textContent=`Recorded ${trace.frameCount} frames. Kept in this tab until cleared or re-recorded.`;
+    syncFieldPackButton();
     return;
   }
   if(!cameraStarted||!poseReady){
@@ -663,6 +688,7 @@ traceToggle.addEventListener("click",()=>{
   traceToggle.textContent="Stop motion trace";
   traceExport.disabled=true;
   traceStatus.textContent="Recording numeric pose data…";
+  syncFieldPackButton();
 });
 
 deviceReportExport.addEventListener("click",()=>{
@@ -699,6 +725,29 @@ traceExport.addEventListener("click",()=>{
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
   traceStatus.textContent=`Exported ${trace.frameCount} numeric frames.`;
+});
+
+fieldPackExport.addEventListener("click",()=>{
+  const built=buildFieldTestPack({
+    motionTrace:traceRecorder.export(),
+    deviceReport:deviceDiagnostics.report(),
+    roundEvidence:lastFieldRoundEvidence,
+  });
+  if(!built.ok){
+    traceStatus.textContent=`Field-test pack unavailable · ${built.reason}`;
+    syncFieldPackButton();
+    return;
+  }
+  const blob=new Blob([JSON.stringify(built.value,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`candle-strike-field-test-${new Date().toISOString().replace(/[:.]/g,"-")}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  traceStatus.textContent=`Exported field-test pack · ${built.value.motionTrace.frameCount} motion frames + latest candle round.`;
 });
 
 traceImport.addEventListener("change",async()=>{
@@ -765,4 +814,5 @@ traceClear.addEventListener("click",()=>{
   traceReplay.disabled=true;
   traceClear.disabled=true;
   traceStatus.textContent="Trace cleared from this tab.";
+  syncFieldPackButton();
 });

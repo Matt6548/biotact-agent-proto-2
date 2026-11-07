@@ -68,6 +68,7 @@ test("focused arena completes one fixed-goal five-strike round",async({page},tes
   await expect(page.locator("#session-rounds")).toHaveText("1");
   await expect(page.locator("#session-score")).not.toHaveText("—");
   await expect(page.locator("#session-focus")).not.toHaveText("");
+  await expect(page.locator("#field-pack-export")).toBeDisabled();
 
   await page.screenshot({path:testInfo.outputPath("02-round-complete.png"),fullPage:true});
 });

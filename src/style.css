@@ -35,7 +35,7 @@
 .field-test-body strong{display:block;color:#e1ddd0;font-size:.9rem}
 .field-test-body p{margin:5px 0 0;color:#999c92;font-size:.78rem;line-height:1.45;max-width:68ch}
 .field-test-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.field-test-body>span{grid-column:1/-1;color:#999c92;font-size:.75rem}
+.field-test-body>span{grid-column:1/-1;color:#999c92;font-size:.75rem}.field-pack-note{grid-column:1/-1;color:#7f8279;font-size:.68rem;line-height:1.4}
 .field-test button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:600px){
   .field-test-body{grid-template-columns:1fr}
