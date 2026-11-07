@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Private account/profile state. Client may read only its own record.
+    // All writes are reserved for trusted server code.
+    match /players/{uid} {
+      allow read: if owns(uid);
+      allow create, update, delete: if false;
+    }
+
+    // Public leaderboard contains display-safe fields only:
+    // displayName, score, levelId, successes, createdAt, receiptId.
+    // Clients can read but never write.
+    match /leaderboard/{entryId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    // A signed-in player may inspect their own server-issued ranked receipts.
+    match /rankedRounds/{roundId} {
+      allow read: if signedIn() && resource.data.uid == request.auth.uid;
+      allow create, update, delete: if false;
+    }
+
+    // Fail closed for every path not explicitly modeled above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 25.3
+## Current checkpoint — Stage 26
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -59,6 +59,9 @@ A separate Vercel configuration is now committed for a new Martial Training HTTP
 
 ## Player / story / ranking foundation
 The app now starts with a mandatory mission briefing, a local player profile and story chapters integrated into progression. Personal best is local. Global ranking remains locked until a secure authentication + server-validated leaderboard backend is connected; client-only scores are intentionally not trusted for global rank.
+
+## Secure online backend foundation
+A provider-neutral ranked-round contract and Firebase-ready hosting/rules configuration are now committed. Clients cannot write leaderboard or ranked receipts directly, and ranked payloads explicitly reject raw landmarks, motion traces, media, device reports and client scores. Cloud registration is still inactive until a real backend project is connected.
 
 ## Main remaining blocker
 Real HTTPS device testing with actual human movement is still required. Automated fake-camera tests prove runtime/privacy/recovery behavior, not punch-recognition quality in real lighting, clothing, camera angles, or devices.

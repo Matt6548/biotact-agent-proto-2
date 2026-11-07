@@ -33,6 +33,19 @@ for(const [key,value] of Object.entries(expected)){
 }
 ok("Netlify legacy config matches canonical production headers");
 
+const firebase=JSON.parse(fs.readFileSync("firebase.json","utf8"));
+if(firebase.hosting?.public!=="dist")fail("Firebase Hosting public directory must be dist");
+const firebaseRoute=firebase.hosting?.headers?.find((entry)=>entry.source==="**");
+if(!firebaseRoute)fail("firebase.json missing catch-all headers rule");
+const firebaseHeaders=Object.fromEntries((firebaseRoute.headers||[]).map(({key,value})=>[key,value]));
+for(const [key,value] of Object.entries(expected)){
+  if(firebaseHeaders[key]!==value)fail(`Firebase header mismatch: ${key}`);
+}
+if(!firebase.hosting?.rewrites?.some((entry)=>entry.source==="**"&&entry.destination==="/index.html")){
+  fail("Firebase Hosting missing SPA fallback");
+}
+ok("Firebase Hosting build + security headers");
+
 const portable=fs.readFileSync("PORTABLE_SERVER.py","utf8");
 for(const key of Object.keys(expected)){
   if(!portable.includes(`"${key}"`))fail(`Portable server missing header: ${key}`);

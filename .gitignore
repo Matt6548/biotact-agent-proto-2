@@ -9,3 +9,9 @@ test-results/
 # Generated self-hosted MediaPipe runtime assets
 public/mediapipe/
 public/models/
+
+# Hosting / local platform state
+.firebase/
+.netlify/
+.env.local
+.env.*.local
