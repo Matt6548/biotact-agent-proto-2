@@ -1,5 +1,6 @@
 import "./style.css";
 import { buildCoachFeedback } from "./core/coach.js";
+import { buildRoundInsight } from "./core/round-insight.js";
 import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
@@ -73,11 +74,14 @@ root.innerHTML=`
     <p id="chapter-brief">Learn to move the virtual flame with a clean, repeatable line. Raw speed alone is not the goal.</p>
   </section>
 
-  <section class="player-rank-strip" aria-label="Player and ranking status">
-    <div><span>Player</span><strong id="player-display">Local player</strong></div>
-    <div><span>Personal best</span><strong id="personal-best">—</strong></div>
-    <div><span>Global rank</span><strong>Locked</strong><small>Requires a verified online account and server-validated results.</small></div>
-  </section>
+  <details class="player-layer">
+    <summary>Player profile & optional ranking</summary>
+    <section class="player-rank-strip" aria-label="Player and ranking status">
+      <div><span>Player</span><strong id="player-display">Local player</strong></div>
+      <div><span>Personal best</span><strong id="personal-best">—</strong></div>
+      <div><span>Global rank</span><strong>Locked</strong><small>Optional. Requires a verified online account and server-validated results.</small></div>
+    </section>
+  </details>
 
   <section class="arena-status" aria-label="Training status">
     <div><span>Goal</span><strong id="arena-goal">Deflect the flame</strong></div>
@@ -117,6 +121,19 @@ root.innerHTML=`
     <div><span>Target hits</span><strong id="summary-success">—</strong><small>needed 3 of 5</small></div>
     <div><span>Best intensity</span><strong id="summary-speed">—</strong><small>normalized reference</small></div>
     <div><span>Best line</span><strong id="summary-line">—</strong><small>trajectory straightness</small></div>
+  </section>
+
+  <section class="round-insight" id="round-insight" hidden aria-live="polite">
+    <div class="round-insight-score">
+      <span>Repeatability</span>
+      <strong id="summary-consistency">—</strong>
+      <small id="summary-consistency-detail">Engineering training index, not a biomechanical measurement.</small>
+    </div>
+    <div class="round-insight-drill">
+      <span>Next candle drill</span>
+      <strong id="summary-drill">—</strong>
+      <p id="summary-drill-cue">Complete a five-strike round first.</p>
+    </div>
   </section>
 
   <details class="history-card"><summary>Recent attempts <span id="history-count">0</span></summary><div class="history-head"><span>Stored only in this browser</span><button class="text-button" id="clear-history" type="button">Clear</button></div><ol id="history" class="history-list"></ol></details>
@@ -175,7 +192,7 @@ const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelec
 const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),deviceReadinessEl=root.querySelector("#device-readiness"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
 const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySelector("#coach-cues"),levelEl=root.querySelector("#level"),levelProgress=root.querySelector("#level-progress");
-const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
+const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),roundInsight=root.querySelector("#round-insight"),summaryConsistency=root.querySelector("#summary-consistency"),summaryConsistencyDetail=root.querySelector("#summary-consistency-detail"),summaryDrill=root.querySelector("#summary-drill"),summaryDrillCue=root.querySelector("#summary-drill-cue"),hitFeedback=root.querySelector("#hit-feedback");
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
 let localPlayer=readLocalPlayer();
@@ -317,6 +334,14 @@ function updateRound(snapshot=round.snapshot()){
     root.querySelector("#summary-success").textContent=`${snapshot.successes}/${snapshot.attemptLimit}`;
     root.querySelector("#summary-speed").textContent=snapshot.bestIntensityRatio>0?`${snapshot.bestIntensityRatio.toFixed(2)}×`:"—";
     root.querySelector("#summary-line").textContent=`${Math.round(snapshot.bestStraightness*100)}%`;
+    const insight=buildRoundInsight(round.attempts);
+    roundInsight.hidden=false;
+    summaryConsistency.textContent=insight.ready?`${insight.label} · ${insight.repeatabilityIndex}/100`:"Need more strikes";
+    summaryConsistencyDetail.textContent=insight.ready
+      ?`Median line ${insight.metrics.medianStraightness}% · intensity spread ${insight.metrics.intensitySpread}% · target hits ${insight.metrics.successRate}%`
+      :"Engineering training index, not a biomechanical measurement.";
+    summaryDrill.textContent=insight.drill.title;
+    summaryDrillCue.textContent=insight.drill.cue;
   }
   updateLevel();updatePrimary();
 }
@@ -551,7 +576,7 @@ function runCalibration(){
   updatePrimary();
 }
 function startRound({simulation=false}={}){
-  round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;updateRound();
+  round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;updateRound();
   coachOutcome.textContent=simulation?"Simulated round active. Use Simulate strike five times.":"Round active. Five controlled strikes.";
   coachCues.innerHTML="";resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";
 }
@@ -573,7 +598,7 @@ stopCamera.addEventListener("click",()=>{
   syncRendererMode();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";modelBackendEl.textContent="—";inferenceEl.textContent="—";busySkipsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
-  if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
+  if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
   updateRound();
 });
 

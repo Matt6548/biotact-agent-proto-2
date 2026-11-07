@@ -35,6 +35,7 @@ test("focused arena completes one fixed-goal five-strike round",async({page},tes
   await completeBriefing(page);
   await expect(page.getByRole("heading",{name:"Candle Strike"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
+  await expect(page.locator(".player-layer")).not.toHaveAttribute("open","");
   await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
 
   const target=page.locator("#target-canvas canvas");
@@ -60,6 +61,9 @@ test("focused arena completes one fixed-goal five-strike round",async({page},tes
   await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
   await expect(page.locator("#round-success")).toHaveText("3 / 3");
   await expect(page.locator("#level")).toHaveText("Next · 2 · Destabilize");
+  await expect(page.locator("#round-insight")).toBeVisible();
+  await expect(page.locator("#summary-consistency")).toContainText(/Stable|Developing|Variable/);
+  await expect(page.locator("#summary-drill")).toContainText(/drill/i);
 
   await page.screenshot({path:testInfo.outputPath("02-round-complete.png"),fullPage:true});
 });

@@ -2,7 +2,7 @@
 
 A local-first martial-arts training game prototype rebooted from the old Biotact project.
 
-## Current checkpoint — Stage 26.1
+## Current checkpoint — Stage 27
 The active branch is `martial-training-lab`.
 
 ### Training loop
@@ -11,7 +11,8 @@ The active branch is `martial-training-lab`.
 - advancement requires 3/5 target hits;
 - deterministic candle/flame scoring and concise measured coaching;
 - personal-reference strike intensity rather than raw camera speed for gameplay;
-- local recent-attempt history.
+- local recent-attempt history;
+- post-round repeatability insight and one focused candle drill based on line control, normalized intensity spread and target-hit consistency.
 
 ### Vision / privacy
 - MediaPipe Pose Landmarker runs in a Web Worker;
@@ -57,8 +58,8 @@ Every successful CI run now publishes a `martial-training-windows-demo` artifact
 ## Deployment readiness
 A separate Vercel configuration is now committed for a new Martial Training HTTPS deployment. It keeps the same production security headers as the verified local server. The existing GitHub Pages site remains the legacy Biotact app and is intentionally untouched.
 
-## Player / story / ranking foundation
-The app now starts with a mandatory mission briefing, a local player profile and story chapters integrated into progression. Personal best is local. Global ranking remains locked until a secure authentication + server-validated leaderboard backend is connected; client-only scores are intentionally not trusted for global rank.
+## Optional player / story / ranking foundation
+The app starts with a one-time safety/game briefing, then returns attention to the candle-training loop. Local profile and story progression remain lightweight. Player/ranking UI is collapsed by default and optional. Global ranking stays locked until a secure authentication + server-validated leaderboard backend is connected; client-only scores are intentionally not trusted for global rank.
 
 ## Secure online backend foundation
 A provider-neutral ranked-round contract and Firebase-ready hosting/rules configuration are now committed. Clients cannot write leaderboard or ranked receipts directly, and ranked payloads explicitly reject raw landmarks, motion traces, media, device reports and client scores. Cloud registration is still inactive until a real backend project is connected.
