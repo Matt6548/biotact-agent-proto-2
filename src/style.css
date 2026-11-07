@@ -169,26 +169,28 @@
 
 
 /* Stage 25 — mandatory mission briefing + player shell */
+body.briefing-open{overflow:hidden}
 .mission-gate{
   position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;
-  background:rgba(8,9,8,.94);backdrop-filter:blur(12px);overflow:auto;
+  background:rgba(8,9,8,.94);backdrop-filter:blur(12px);overflow:auto;overscroll-behavior:contain;
 }
 .mission-gate[hidden]{display:none}
 .briefing-shell{
   width:min(760px,100%);border:1px solid #373a33;border-radius:24px;background:#151612;
   padding:clamp(22px,5vw,38px);box-shadow:0 32px 90px rgba(0,0,0,.45);
 }
-.briefing-kicker{margin:0 0 8px;color:#9ea096;font-size:.76rem;text-transform:uppercase;letter-spacing:.12em}
-.briefing-shell h1{margin:0;font-size:clamp(2.5rem,8vw,5.4rem);line-height:.94;letter-spacing:-.045em}
-.briefing-lede{margin:16px 0 0;color:#c8c5ba;line-height:1.6;max-width:68ch}
+.briefing-shell h1{margin:0;font-size:clamp(2.5rem,8vw,5.4rem);line-height:.94;letter-spacing:-.04em}
+.briefing-meta{margin:10px 0 0;color:#96998f;font-size:.76rem}
+.briefing-lede{margin:14px 0 0;color:#c8c5ba;line-height:1.6;max-width:68ch}
 .briefing-story{margin-top:20px;border-left:2px solid #d6cfb6;padding:4px 0 4px 16px}
 .briefing-story span{display:block;color:#a2a49a;font-size:.74rem}
 .briefing-story strong{display:block;margin-top:6px;color:#eee9db;font-size:1.04rem;line-height:1.4}
 .briefing-story p{margin:7px 0 0;color:#9fa198;font-size:.82rem;line-height:1.5}
-.briefing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:20px}
-.briefing-grid div{border:1px solid #2e302b;border-radius:14px;padding:12px;background:#11120f}
-.briefing-grid b{display:block;color:#e8e3d5;font-size:.82rem}
-.briefing-grid span{display:block;margin-top:5px;color:#979a90;font-size:.75rem;line-height:1.45}
+.briefing-steps{list-style:none;counter-reset:briefing-step;display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:20px 0 0;padding:0}
+.briefing-steps li{counter-increment:briefing-step;min-width:0;padding-top:10px;border-top:1px solid #363830}
+.briefing-steps b{display:flex;align-items:center;gap:7px;color:#e8e3d5;font-size:.82rem}
+.briefing-steps b::before{content:counter(briefing-step);display:grid;place-items:center;width:21px;height:21px;border:1px solid #54574e;border-radius:50%;color:#aaa99f;font-size:.68rem;font-weight:600;flex:0 0 auto}
+.briefing-steps span{display:block;margin-top:6px;color:#979a90;font-size:.75rem;line-height:1.45}
 .player-name-field{display:grid;gap:7px;margin-top:20px;color:#d8d4c8;font-size:.8rem}
 .player-name-field input{min-height:46px;border:1px solid #41443c;border-radius:12px;background:#0f100e;color:#f1ede2;padding:0 13px}
 .player-name-field small{color:#85887f;font-size:.7rem}
@@ -208,7 +210,8 @@
 .player-rank-strip strong{display:block;margin-top:3px;color:#ddd9cb;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .player-rank-strip small{margin-top:4px;line-height:1.35}
 @media(max-width:700px){
-  .briefing-grid{grid-template-columns:1fr}
+  .briefing-steps{grid-template-columns:1fr;gap:9px}
+  .briefing-steps li{padding-top:8px}
   .briefing-shell{padding:20px 16px;border-radius:18px}
   .player-rank-strip{grid-template-columns:1fr 1fr}
   .player-rank-strip>div:last-child{grid-column:1/-1}

@@ -12,7 +12,7 @@ async function completeBriefing(page,name="Test Player"){
 
 test("mandatory briefing explains the game before training",async({page},testInfo)=>{
   await page.goto("/");
-  await expect(page.getByText("Mission briefing · required")).toBeVisible();
+  await expect(page.getByText("Required once before your first session.")).toBeVisible();
   await expect(page.getByText(/does not measure real punch force/i)).toBeVisible();
   await expect(page.getByText(/No real candle is needed/i)).toBeVisible();
   await expect(page.getByRole("button",{name:"Enter training"})).toBeDisabled();
@@ -23,6 +23,11 @@ test("mandatory briefing explains the game before training",async({page},testInf
   await page.getByRole("button",{name:"Enter training"}).click();
   await expect(page.locator("#mission-gate")).toBeHidden();
   await expect(page.locator("#player-display")).toHaveText("QA Fighter");
+
+  await page.reload();
+  await expect(page.locator("#mission-gate")).toBeHidden();
+  await expect(page.locator("#player-display")).toHaveText("QA Fighter");
+  await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
 });
 
 test("focused arena completes one fixed-goal five-strike round",async({page},testInfo)=>{

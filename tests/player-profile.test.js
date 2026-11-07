@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildLocalPlayerProfile, normalizePlayerName } from "../src/core/player-profile.js";
+import { buildLocalPlayerProfile, hasCompletedBriefing, normalizePlayerName } from "../src/core/player-profile.js";
 
 test("player name normalizes whitespace and safe unicode letters",()=>{
   const result=normalizePlayerName("  Азамат   Player_01  ");
@@ -20,10 +20,27 @@ test("local profile is explicit that it is not an online account",()=>{
   const result=buildLocalPlayerProfile("Fighter 01",{now:123});
   assert.equal(result.ok,true);
   assert.deepEqual(result.value,{
-    schemaVersion:1,
+    schemaVersion:2,
     kind:"local-player-profile",
     name:"Fighter 01",
     createdAt:123,
+    briefingAcceptedAt:null,
+    safetyAcknowledgedAt:null,
     onlineAccount:false,
   });
+  assert.equal(hasCompletedBriefing(result.value),false);
+});
+
+
+test("accepting briefing is persisted and preserves original profile creation time",()=>{
+  const previous=buildLocalPlayerProfile("Fighter 01",{now:100}).value;
+  const accepted=buildLocalPlayerProfile("Fighter 01",{
+    now:500,
+    previous,
+    acceptBriefing:true,
+  }).value;
+  assert.equal(accepted.createdAt,100);
+  assert.equal(accepted.briefingAcceptedAt,500);
+  assert.equal(accepted.safetyAcknowledgedAt,500);
+  assert.equal(hasCompletedBriefing(accepted),true);
 });

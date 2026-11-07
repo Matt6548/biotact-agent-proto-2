@@ -14,16 +14,35 @@ export function normalizePlayerName(value,{min=3,max=20}={}){
   return{ok:true,value:normalized,reason:null};
 }
 
-export function buildLocalPlayerProfile(name,{now=Date.now()}={}){
+export function hasCompletedBriefing(profile){
+  return Boolean(
+    profile?.kind==="local-player-profile" &&
+    typeof profile?.name==="string" &&
+    Number.isFinite(profile?.briefingAcceptedAt) &&
+    Number.isFinite(profile?.safetyAcknowledgedAt)
+  );
+}
+
+export function buildLocalPlayerProfile(name,{now=Date.now(),previous=null,acceptBriefing=false}={}){
   const normalized=normalizePlayerName(name);
   if(!normalized.ok)return normalized;
+  const createdAt=Number.isFinite(previous?.createdAt)?previous.createdAt:now;
+  const briefingAcceptedAt=acceptBriefing
+    ?now
+    :Number.isFinite(previous?.briefingAcceptedAt)?previous.briefingAcceptedAt:null;
+  const safetyAcknowledgedAt=acceptBriefing
+    ?now
+    :Number.isFinite(previous?.safetyAcknowledgedAt)?previous.safetyAcknowledgedAt:null;
+
   return{
     ok:true,
     value:{
-      schemaVersion:1,
+      schemaVersion:2,
       kind:"local-player-profile",
       name:normalized.value,
-      createdAt:now,
+      createdAt,
+      briefingAcceptedAt,
+      safetyAcknowledgedAt,
       onlineAccount:false,
     },
     reason:null,

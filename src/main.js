@@ -4,7 +4,7 @@ import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
 import { DeviceDiagnostics } from "./core/device-diagnostics.js";
-import { buildLocalPlayerProfile, normalizePlayerName } from "./core/player-profile.js";
+import { buildLocalPlayerProfile, hasCompletedBriefing, normalizePlayerName } from "./core/player-profile.js";
 import { storyForLevel } from "./core/story.js";
 import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
@@ -28,8 +28,8 @@ const PLAYER_PROFILE_KEY="martial-training-lab.player.v1";
 root.innerHTML=`
 <section class="mission-gate" id="mission-gate" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
   <div class="briefing-shell">
-    <p class="briefing-kicker">Mission briefing · required</p>
     <h1 id="briefing-title">Candle Strike</h1>
+    <p class="briefing-meta">Required once before your first session.</p>
     <p class="briefing-lede">A camera-based movement training game. The system estimates visible body motion and compares you with your own calibration — it does not measure real punch force.</p>
 
     <div class="briefing-story">
@@ -38,11 +38,11 @@ root.innerHTML=`
       <p>The flame is a training target, not a claim about hidden energy. No real candle is needed.</p>
     </div>
 
-    <div class="briefing-grid">
-      <div><b>1 · Frame</b><span>Keep shoulders, elbows, wrists and hips visible.</span></div>
-      <div><b>2 · Calibrate</b><span>Use 3–5 comfortable straight punches, not maximum effort.</span></div>
-      <div><b>3 · Train</b><span>Complete five-strike rounds and unlock harder virtual targets.</span></div>
-    </div>
+    <ol class="briefing-steps">
+      <li><b>Frame</b><span>Keep shoulders, elbows, wrists and hips visible.</span></li>
+      <li><b>Calibrate</b><span>Use 3–5 comfortable straight punches, not maximum effort.</span></li>
+      <li><b>Train</b><span>Complete five-strike rounds and unlock harder virtual targets.</span></li>
+    </ol>
 
     <label class="player-name-field">
       <span>Player name</span>
@@ -224,12 +224,36 @@ function updateBriefingControls(){
   enterTraining.disabled=!(name.ok&&safetyAck.checked);
   briefingError.textContent=playerNameInput.value&& !name.ok?"Use 3–20 letters, numbers, spaces, _ or -.":"";
 }
+function showBriefing(){
+  missionGate.hidden=false;
+  lab.inert=true;
+  document.body.classList.add("briefing-open");
+  requestAnimationFrame(()=>playerNameInput.focus());
+}
+function hideBriefing({focusTraining=false}={}){
+  missionGate.hidden=true;
+  lab.inert=false;
+  document.body.classList.remove("briefing-open");
+  if(focusTraining)primaryAction.focus();
+}
 if(localPlayer?.name)playerNameInput.value=localPlayer.name;
 playerNameInput.addEventListener("input",updateBriefingControls);
 safetyAck.addEventListener("change",updateBriefingControls);
 updateBriefingControls();
+
+if(hasCompletedBriefing(localPlayer)){
+  hideBriefing();
+}else{
+  showBriefing();
+}
+
 enterTraining.addEventListener("click",()=>{
-  const profile=buildLocalPlayerProfile(playerNameInput.value);
+  const now=Date.now();
+  const profile=buildLocalPlayerProfile(playerNameInput.value,{
+    now,
+    previous:localPlayer,
+    acceptBriefing:true,
+  });
   if(!profile.ok||!safetyAck.checked){
     briefingError.textContent="Enter a valid player name and confirm the safety rule.";
     return;
@@ -237,9 +261,7 @@ enterTraining.addEventListener("click",()=>{
   localPlayer=profile.value;
   writeLocalPlayer(localPlayer);
   playerDisplay.textContent=localPlayer.name;
-  missionGate.hidden=true;
-  lab.inert=false;
-  primaryAction.focus();
+  hideBriefing({focusTraining:true});
 });
 function readHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]").slice(0,8);}catch{return[];}}
 function writeHistory(){localStorage.setItem(HISTORY_KEY,JSON.stringify(attempts.slice(0,8)));}
