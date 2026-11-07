@@ -4,6 +4,8 @@ import { TrainingProgression } from "./core/progression.js";
 import { TrainingRound } from "./core/round.js";
 import { StableReadiness, ValidDurationGate } from "./core/readiness.js";
 import { DeviceDiagnostics } from "./core/device-diagnostics.js";
+import { buildLocalPlayerProfile, normalizePlayerName } from "./core/player-profile.js";
+import { storyForLevel } from "./core/story.js";
 import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
@@ -21,13 +23,61 @@ const calibrationClock=new ValidDurationGate({requiredMs:5000,maxStepMs:100});
 const deviceDiagnostics=new DeviceDiagnostics({maxSamples:300,minSamples:10,minWindowMs:1500});
 const root=document.querySelector("#app");
 const HISTORY_KEY="martial-training-lab.attempts.v1";
+const PLAYER_PROFILE_KEY="martial-training-lab.player.v1";
 
 root.innerHTML=`
-<main class="lab">
+<section class="mission-gate" id="mission-gate" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
+  <div class="briefing-shell">
+    <p class="briefing-kicker">Mission briefing · required</p>
+    <h1 id="briefing-title">Candle Strike</h1>
+    <p class="briefing-lede">A camera-based movement training game. The system estimates visible body motion and compares you with your own calibration — it does not measure real punch force.</p>
+
+    <div class="briefing-story">
+      <span>Chapter 1 · Flame Discipline</span>
+      <strong>Your first task: move the virtual flame with a clean, repeatable strike line.</strong>
+      <p>The flame is a training target, not a claim about hidden energy. No real candle is needed.</p>
+    </div>
+
+    <div class="briefing-grid">
+      <div><b>1 · Frame</b><span>Keep shoulders, elbows, wrists and hips visible.</span></div>
+      <div><b>2 · Calibrate</b><span>Use 3–5 comfortable straight punches, not maximum effort.</span></div>
+      <div><b>3 · Train</b><span>Complete five-strike rounds and unlock harder virtual targets.</span></div>
+    </div>
+
+    <label class="player-name-field">
+      <span>Player name</span>
+      <input id="player-name-input" type="text" inputmode="text" autocomplete="nickname" minlength="3" maxlength="20" placeholder="3–20 characters" />
+      <small>Saved only in this browser for now. This is not yet an online account.</small>
+    </label>
+
+    <label class="safety-ack">
+      <input id="safety-ack" type="checkbox" />
+      <span>I have clear space to move and I will not punch near a real flame, glass, people or fragile objects.</span>
+    </label>
+
+    <p class="briefing-error" id="briefing-error" aria-live="polite"></p>
+    <button id="enter-training" type="button" disabled>Enter training</button>
+    <p class="briefing-privacy">Camera processing stays local in the current build. Motion traces are exported only when you explicitly choose to export them.</p>
+  </div>
+</section>
+
+<main class="lab" inert>
   <header class="hero">
     <div><h1>Candle Strike</h1><p class="stage-label">Training Arena · local motion + reactive 3D target</p></div>
     <p class="lede">Five controlled strikes. Build a repeatable line, move the virtual flame, then earn the next distance.</p>
   </header>
+
+  <section class="mission-strip" aria-label="Current story mission">
+    <span id="chapter-label">Chapter 1 · Flame Discipline</span>
+    <strong id="chapter-mission">Deflect the flame</strong>
+    <p id="chapter-brief">Learn to move the virtual flame with a clean, repeatable line. Raw speed alone is not the goal.</p>
+  </section>
+
+  <section class="player-rank-strip" aria-label="Player and ranking status">
+    <div><span>Player</span><strong id="player-display">Local player</strong></div>
+    <div><span>Personal best</span><strong id="personal-best">—</strong></div>
+    <div><span>Global rank</span><strong>Locked</strong><small>Requires a verified online account and server-validated results.</small></div>
+  </section>
 
   <section class="arena-status" aria-label="Training status">
     <div><span>Goal</span><strong id="arena-goal">Deflect the flame</strong></div>
@@ -102,6 +152,16 @@ root.innerHTML=`
 </main>`;
 
 const lab=root.querySelector(".lab");
+const missionGate=root.querySelector("#mission-gate");
+const playerNameInput=root.querySelector("#player-name-input");
+const safetyAck=root.querySelector("#safety-ack");
+const enterTraining=root.querySelector("#enter-training");
+const briefingError=root.querySelector("#briefing-error");
+const playerDisplay=root.querySelector("#player-display");
+const personalBestEl=root.querySelector("#personal-best");
+const chapterLabel=root.querySelector("#chapter-label");
+const chapterMission=root.querySelector("#chapter-mission");
+const chapterBrief=root.querySelector("#chapter-brief");
 lab.dataset.live="off";
 const mobileTrainingQuery=window.matchMedia("(max-width: 600px)");
 const candleRenderer=createCandleTarget(root.querySelector("#target-canvas"),{
@@ -118,6 +178,7 @@ const coachOutcome=root.querySelector("#coach-outcome"),coachCues=root.querySele
 const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector("#round-count"),roundSuccess=root.querySelector("#round-success"),roundSummary=root.querySelector("#round-summary"),hitFeedback=root.querySelector("#hit-feedback");
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false;
+let localPlayer=readLocalPlayer();
 let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
 
 function syncRendererMode(){
@@ -148,11 +209,44 @@ mobileTrainingQuery.addEventListener?.("change",syncRendererMode);
 document.addEventListener("visibilitychange",syncRendererMode);
 const CONNECTIONS=[[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24]];
 
-function levelGoal(level){return level.id===1?"Deflect the flame":level.id===2?"Make the flame unstable":level.id===3?"Extinguish the flame":"Extinguish from longer virtual range";}
+function levelGoal(level){return storyForLevel(level.id).mission;}
+function readLocalPlayer(){
+  try{
+    const parsed=JSON.parse(localStorage.getItem(PLAYER_PROFILE_KEY)||"null");
+    return parsed?.kind==="local-player-profile"&&typeof parsed?.name==="string"?parsed:null;
+  }catch{return null;}
+}
+function writeLocalPlayer(profile){
+  localStorage.setItem(PLAYER_PROFILE_KEY,JSON.stringify(profile));
+}
+function updateBriefingControls(){
+  const name=normalizePlayerName(playerNameInput.value);
+  enterTraining.disabled=!(name.ok&&safetyAck.checked);
+  briefingError.textContent=playerNameInput.value&& !name.ok?"Use 3–20 letters, numbers, spaces, _ or -.":"";
+}
+if(localPlayer?.name)playerNameInput.value=localPlayer.name;
+playerNameInput.addEventListener("input",updateBriefingControls);
+safetyAck.addEventListener("change",updateBriefingControls);
+updateBriefingControls();
+enterTraining.addEventListener("click",()=>{
+  const profile=buildLocalPlayerProfile(playerNameInput.value);
+  if(!profile.ok||!safetyAck.checked){
+    briefingError.textContent="Enter a valid player name and confirm the safety rule.";
+    return;
+  }
+  localPlayer=profile.value;
+  writeLocalPlayer(localPlayer);
+  playerDisplay.textContent=localPlayer.name;
+  missionGate.hidden=true;
+  lab.inert=false;
+  primaryAction.focus();
+});
 function readHistory(){try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||"[]").slice(0,8);}catch{return[];}}
 function writeHistory(){localStorage.setItem(HISTORY_KEY,JSON.stringify(attempts.slice(0,8)));}
 function renderHistory(){
   historyCount.textContent=String(attempts.length);
+  const best=attempts.reduce((max,attempt)=>Math.max(max,Number(attempt?.score)||0),0);
+  personalBestEl.textContent=best>0?String(best):"—";
   historyEl.innerHTML=attempts.length
     ?attempts.map((a)=>{
         const intensity=Number.isFinite(a.intensityRatio)?`${a.intensityRatio.toFixed(2)}× ref`:`${a.speed.toFixed(1)} m/s`;
@@ -167,7 +261,11 @@ function displayedLevel(){
 }
 function updateLevel(){
   const level=displayedLevel();
+  const chapter=storyForLevel(level.id);
   arenaGoal.textContent=levelGoal(level);
+  chapterLabel.textContent=`Chapter ${chapter.id} · ${chapter.title}`;
+  chapterMission.textContent=chapter.mission;
+  chapterBrief.textContent=chapter.brief;
   const hits=(round.active||round.complete)?Math.min(round.snapshot().successes,progression.requiredSuccesses):0;
   levelProgress.textContent=`${hits}/${progression.requiredSuccesses}`;
   if(round.complete&&lastRoundOutcome?.levelUp){
@@ -200,6 +298,7 @@ function updateRound(snapshot=round.snapshot()){
   }
   updateLevel();updatePrimary();
 }
+if(localPlayer?.name)playerDisplay.textContent=localPlayer.name;
 renderHistory();updateLevel();updateRound();updatePrimary();
 
 function saveAttempt(strike,result,level,intensity){

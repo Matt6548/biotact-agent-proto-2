@@ -1,5 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+async function completeBriefing(page,name="Test Player"){
+  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toBeVisible();
+  await page.locator("#player-name-input").fill(name);
+  await page.locator("#safety-ack").check();
+  await expect(page.getByRole("button",{name:"Enter training"})).toBeEnabled();
+  await page.getByRole("button",{name:"Enter training"}).click();
+  await expect(page.locator("#mission-gate")).toBeHidden();
+}
+
+
 
 test("fake webcam initializes private pose runtime and the correct renderer mode",async({page},testInfo)=>{
   const external=[];
@@ -11,6 +21,7 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   });
 
   await page.goto("/");
+  await completeBriefing(page);
   await page.getByRole("button",{name:"Start training"}).click();
 
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
@@ -75,6 +86,7 @@ test("fake webcam produces an aggregate device-readiness report",async({page},te
   });
 
   await page.goto("/");
+  await completeBriefing(page);
   await page.getByRole("button",{name:"Start training"}).click();
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});

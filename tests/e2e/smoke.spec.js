@@ -1,7 +1,33 @@
 import { test, expect } from "@playwright/test";
 
+async function completeBriefing(page,name="Test Player"){
+  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toBeVisible();
+  await page.locator("#player-name-input").fill(name);
+  await page.locator("#safety-ack").check();
+  await expect(page.getByRole("button",{name:"Enter training"})).toBeEnabled();
+  await page.getByRole("button",{name:"Enter training"}).click();
+  await expect(page.locator("#mission-gate")).toBeHidden();
+}
+
+
+test("mandatory briefing explains the game before training",async({page},testInfo)=>{
+  await page.goto("/");
+  await expect(page.getByText("Mission briefing · required")).toBeVisible();
+  await expect(page.getByText(/does not measure real punch force/i)).toBeVisible();
+  await expect(page.getByText(/No real candle is needed/i)).toBeVisible();
+  await expect(page.getByRole("button",{name:"Enter training"})).toBeDisabled();
+  await page.locator("#player-name-input").fill("QA Fighter");
+  await expect(page.getByRole("button",{name:"Enter training"})).toBeDisabled();
+  await page.locator("#safety-ack").check();
+  await page.screenshot({path:testInfo.outputPath("00-mission-briefing.png"),fullPage:true});
+  await page.getByRole("button",{name:"Enter training"}).click();
+  await expect(page.locator("#mission-gate")).toBeHidden();
+  await expect(page.locator("#player-display")).toHaveText("QA Fighter");
+});
+
 test("focused arena completes one fixed-goal five-strike round",async({page},testInfo)=>{
   await page.goto("/");
+  await completeBriefing(page);
   await expect(page.getByRole("heading",{name:"Candle Strike"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
   await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
@@ -36,6 +62,7 @@ test("focused arena completes one fixed-goal five-strike round",async({page},tes
 test("mobile focused arena has one primary action and no horizontal overflow",async({page},testInfo)=>{
   test.skip(testInfo.project.name!=="mobile-chromium","mobile-specific check");
   await page.goto("/");
+  await completeBriefing(page);
   await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
   await expect(page.locator(".tracking-details")).not.toHaveAttribute("open","");
   const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
