@@ -756,6 +756,8 @@ traceImport.addEventListener("change",async()=>{
   traceReplay.disabled=true;
   if(!file)return;
   try{
+    // Reject oversized files before loading them into memory or parsing JSON.
+    if(file.size>5*1024*1024)throw new Error("trace-file-too-large");
     const parsed=JSON.parse(await file.text());
     const validation=validateMotionTrace(parsed);
     if(!validation.ok)throw new Error(validation.reason);
