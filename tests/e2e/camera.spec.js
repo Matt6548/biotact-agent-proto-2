@@ -66,6 +66,28 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
     expect(focusState.stop.scrollWidth).toBeLessThanOrEqual(focusState.stop.clientWidth+1);
 
     await expect(page.locator(".target-card")).toBeVisible();
+    const mobileLayout=await page.evaluate(()=>{
+      const bounds=(selector)=>{
+        const {left,right,top,bottom,width,height}=document.querySelector(selector).getBoundingClientRect();
+        return{left,right,top,bottom,width,height};
+      };
+      return{
+        scene:bounds(".scene"),
+        camera:bounds(".camera-card"),
+        video:bounds("#camera-stage"),
+        pageWidth:document.documentElement.scrollWidth,
+        viewportWidth:document.documentElement.clientWidth,
+      };
+    });
+    // A phone should show the person and flame at once: one compact camera
+    // preview overlays the candle scene instead of sitting below the fold.
+    expect(mobileLayout.camera.left).toBeGreaterThanOrEqual(mobileLayout.scene.left-2);
+    expect(mobileLayout.camera.right).toBeLessThanOrEqual(mobileLayout.scene.right+2);
+    expect(mobileLayout.camera.top).toBeGreaterThanOrEqual(mobileLayout.scene.top-2);
+    expect(mobileLayout.camera.bottom).toBeLessThanOrEqual(mobileLayout.scene.bottom+2);
+    expect(mobileLayout.video.width).toBeGreaterThan(100);
+    expect(mobileLayout.video.height).toBeGreaterThan(70);
+    expect(mobileLayout.pageWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth+1);
     await page.getByRole("button",{name:"Пауза"}).click();
     await expect(page.getByRole("button",{name:"Продолжить"})).toBeEnabled();
     await page.getByRole("button",{name:"Продолжить"}).click();

@@ -287,3 +287,56 @@ body.briefing-open{overflow:hidden}
   .hit-feedback{bottom:54px;font-size:.76rem}
   .practice-stats>summary{font-size:.8rem}
 }
+
+/* Keep the real camera and the full-size candle visible together in live practice.
+   This is the existing video element, not an extra stream or WebGL renderer. */
+@media(max-width:900px){
+  .lab[data-live="on"] .live-grid{position:relative}
+  .lab[data-live="on"] .camera-card{
+    position:absolute;
+    top:46px;
+    right:12px;
+    z-index:8;
+    width:min(43%,178px);
+    min-width:136px;
+    padding:7px;
+    border:1px solid #777163;
+    border-radius:14px;
+    background:rgba(20,21,17,.96);
+    box-shadow:0 12px 32px rgba(0,0,0,.55);
+  }
+  .lab[data-live="on"] .camera-head{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin-bottom:6px}
+  .lab[data-live="on"] .camera-head h2{font-size:.68rem}
+  .lab[data-live="on"] .status-pill{display:block;max-width:100%;padding:4px 6px;font-size:.61rem}
+  .lab[data-live="on"] .camera-stage{
+    width:100%;
+    height:auto;
+    min-height:0;
+    max-height:none;
+    aspect-ratio:4/3;
+    border-radius:9px;
+  }
+  .lab[data-live="on"] .setup-line{padding:5px 0 0;gap:0}
+  .lab[data-live="on"] .setup-line>div,
+  .lab[data-live="on"] .tracking-details,
+  .lab[data-live="on"] .camera-note{display:none}
+  .lab[data-live="on"] #stop-camera{
+    width:100%;
+    min-height:44px;
+    white-space:nowrap;
+    border-radius:9px;
+    border:1px solid #45483f;
+    color:#ebe5d6;
+    font-size:.75rem;
+  }
+}
+
+@media(max-width:600px){
+  .lab[data-live="on"] .hero{gap:4px;padding-bottom:8px}
+  .lab[data-live="on"] .hero h1{font-size:clamp(1.25rem,5vw,1.55rem);line-height:1.15}
+  .lab[data-live="on"] .hero .stage-label,
+  .lab[data-live="on"] .hero .lede{display:none}
+  .lab[data-live="on"] .hero .safety-inline{font-size:.67rem;line-height:1.35}
+  .lab[data-live="on"] .arena-status{margin-bottom:5px;padding-top:6px;padding-bottom:7px}
+  .lab[data-live="on"] .camera-card{right:9px;width:min(43%,160px)}
+}

@@ -11,6 +11,8 @@ test("one-screen candle practice opens without any mandatory briefing",async({pa
   await expect(page.locator(".mission-strip")).toBeHidden();
   await expect(page.locator(".player-layer")).toBeHidden();
   await expect(page.locator(".level-line")).toBeHidden();
+  const visualOrder=await page.evaluate(()=>Array.from(document.querySelector(".live-grid").children,el=>el.className));
+  expect(visualOrder).toEqual(["target-card","camera-card"]);
   await page.screenshot({path:testInfo.outputPath("01-candle-open.png"),fullPage:true});
 });
 

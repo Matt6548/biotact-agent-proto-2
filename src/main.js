@@ -98,19 +98,6 @@ root.innerHTML=`
   </section>
 
   <section class="live-grid">
-    <article class="camera-card" id="camera-card" data-camera="off">
-      <div class="camera-head"><h2>Камера движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span></div>
-      <div class="camera-stage" id="camera-stage">
-        <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
-        <div class="frame-guide" aria-hidden="true"><span>Keep shoulders and hips inside this area</span></div>
-        <div id="mini-target-canvas" class="mini-target" aria-hidden="true"></div>
-        <div class="camera-empty" id="camera-empty"><strong>Камера пока выключена</strong><span>Включится только после нажатия «Начать упражнение».</span></div>
-      </div>
-      <div class="setup-line"><div><span>Положение</span><strong id="setup-state">Камера не запущена</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Завершить</button></div>
-      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div><div class="device-readiness-line"><span>Device readiness</span><strong id="device-readiness">Collecting…</strong><small>Engineering estimate from runtime FPS and inference latency; not a training or medical score.</small></div></details>
-      <p class="camera-note">Освободи место вокруг себя. Не используй настоящую свечу. Оценка движения не измеряет силу удара.</p>
-    </article>
-
     <article class="target-card">
       <div class="target-head"><h2>Свеча</h2><button class="text-button" id="reset" type="button">Зажечь снова</button></div>
       <div class="scene" aria-label="Virtual candle"><div id="target-canvas" class="target-canvas"></div><div id="hit-feedback" class="hit-feedback" aria-live="polite"></div><div class="target-overlay"><span id="flame-state" aria-live="polite">Пламя спокойно</span><small>Повернуть · приблизить</small></div></div>
@@ -121,6 +108,18 @@ root.innerHTML=`
         <p id="coach-outcome">Начни упражнение, когда будешь готов.</p><ul id="coach-cues"></ul>
       </div>
       </details>
+    </article>
+    <article class="camera-card" id="camera-card" data-camera="off">
+      <div class="camera-head"><h2>Камера движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span></div>
+      <div class="camera-stage" id="camera-stage">
+        <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
+        <div class="frame-guide" aria-hidden="true"><span>Держи плечи и корпус в кадре</span></div>
+        <div id="mini-target-canvas" class="mini-target" aria-hidden="true"></div>
+        <div class="camera-empty" id="camera-empty"><strong>Камера пока выключена</strong><span>Включится только после нажатия «Начать упражнение».</span></div>
+      </div>
+      <div class="setup-line"><div><span>Положение</span><strong id="setup-state">Камера не запущена</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Завершить</button></div>
+      <details class="tracking-details"><summary>Технические данные</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div><div class="device-readiness-line"><span>Device readiness</span><strong id="device-readiness">Collecting…</strong><small>Engineering estimate from runtime FPS and inference latency; not a training or medical score.</small></div></details>
+      <p class="camera-note">Освободи место вокруг себя. Не используй настоящую свечу. Оценка движения не измеряет силу удара.</p>
     </article>
   </section>
 

@@ -16,6 +16,12 @@ This branch is a first **unmerged** UX and integration prototype, not a producti
   a separate Stop action releases the camera.
 - The candle stays full-size on mobile when the camera is active. The second,
   mobile-only WebGL renderer is not created.
+- On narrow screens, the existing camera video becomes a compact picture-in-
+  picture overlay on the large candle after Start, with a visible Stop control.
+  The entry page still shows the larger camera panel before Start. The mobile
+  live header contracts so the flame is usable without a long scroll.
+- Candle markup now precedes camera markup, matching the visible and keyboard
+  reading order. The camera engineering-details disclosure is named in Russian.
 - Technical/trace controls and attempt history remain under collapsed details.
 
 ## Technical adaptation and integration warnings
@@ -43,10 +49,13 @@ This branch is a first **unmerged** UX and integration prototype, not a producti
 
 - npm test: 73/73 PASS (including 500-event free practice).
 - npm run build: PASS; Vite reports an existing >500 kB chunk warning.
-- Browser E2E: attempted but **BLOCKED**, not a product failure; initial
-  Playwright Chromium binary absent. Local /usr/bin/chromium is present but
-  cannot create its ProcessSingleton socket (EPERM) inside this workspace.
-  GitHub Actions should supply an unrestricted browser to verify the PR.
+- Browser E2E at prior head `47eba6f`: **PASS in GitHub Actions** (including
+  desktop/mobile and fake webcam). Its screenshots exposed a genuine mobile
+  ergonomics issue: the camera panel was below the candle, requiring a scroll
+  during practice. The new picture-in-picture layout has added geometry and
+  overflow assertions and still needs a new CI run after pushing this patch.
+- Local Playwright Chromium remains blocked by ProcessSingleton socket EPERM;
+  this is an execution-environment restriction, not a product test failure.
 - No real device/real camera visual test was performed in this environment.
 
 ## Review checklist before merge
@@ -55,7 +64,7 @@ This branch is a first **unmerged** UX and integration prototype, not a producti
 2. Verify webcam granted, denied, idle, paused, resumed, stopped.
 3. Verify 100+ hits do not complete a level or demand another click.
 4. Check physical flame remains visible during live camera on Redmi Note 9S.
-5. Check screen readers and keyboard reading order (camera markup currently
-   precedes target markup, but CSS displays the candle first).
+5. Check screen readers and keyboard reading order: candle now precedes camera;
+   confirm that the live picture-in-picture is navigable without a mouse.
 6. Resolve the field-test evidence pack semantics for continuous practice.
 7. Confirm final artwork and camera behavior with the owner before merge.
