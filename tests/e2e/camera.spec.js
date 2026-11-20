@@ -1,16 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-async function completeBriefing(page,name="Test Player"){
-  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toBeVisible();
-  await page.locator("#player-name-input").fill(name);
-  await page.locator("#safety-ack").check();
-  await expect(page.getByRole("button",{name:"Enter training"})).toBeEnabled();
-  await page.getByRole("button",{name:"Enter training"}).click();
-  await expect(page.locator("#mission-gate")).toBeHidden();
-}
-
-
-
 test("fake webcam initializes private pose runtime and the correct renderer mode",async({page},testInfo)=>{
   test.setTimeout(45_000);
   const external=[];
@@ -22,14 +11,11 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   });
 
   await page.goto("/");
-  await completeBriefing(page);
-  await page.getByRole("button",{name:"Start training"}).click();
+  await page.getByRole("button",{name:"Начать упражнение"}).click();
 
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
-  const frameAction=page.getByRole("button",{name:"Step into frame"});
-  await expect(frameAction).toBeVisible();
-  await expect(frameAction).toBeDisabled();
-  await expect(page.locator("#setup-state")).toContainText(/frame|body|camera/i);
+  await expect(page.getByRole("button",{name:"Пауза"})).toBeEnabled();
+  await expect(page.locator("#setup-state")).toContainText(/кадр|движени|готов|камер|frame|body|motion/i);
   await expect(page.locator("#model-backend")).toHaveText(/GPU|CPU/i);
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
   await expect(page.locator("#busy-skips")).toHaveText(/^\d+$/);
@@ -37,8 +23,8 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   expect(external).toEqual([]);
 
   const mode=await page.locator("#camera-card").getAttribute("data-renderer-mode");
+  expect(mode).toBe("full");
   if(testInfo.project.name==="camera-mobile-chromium"){
-    expect(mode).toBe("mini");
     const focusState=await page.evaluate(()=>{
       const state=(selector)=>{
         const el=document.querySelector(selector);
@@ -66,26 +52,50 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
       };
     });
 
-    expect(focusState.miniCanvasCount).toBe(1);
-    expect(focusState.arenaPosition).toBe("sticky");
-    for(const key of["hero","target","history","fieldTest","simulation"]){
-      expect(focusState[key].exists).toBe(true);
-      expect(focusState[key].display).toBe("none");
+    expect(focusState.miniCanvasCount).toBe(0);
+    expect(focusState.arenaPosition).not.toBe("sticky");
+    for(const key of["hero","target"]){
+      expect(focusState[key].display).not.toBe("none");
     }
     expect(focusState.camera.exists).toBe(true);
     expect(focusState.camera.display).not.toBe("none");
     expect(focusState.frameGuide.exists).toBe(true);
-    expect(focusState.frameGuide.display).not.toBe("none");
     expect(focusState.cameraStatus.exists).toBe(true);
-    expect(focusState.cameraStatus.display).toBe("none");
+    expect(focusState.cameraStatus.display).not.toBe("none");
     expect(focusState.stop.whiteSpace).toBe("nowrap");
     expect(focusState.stop.scrollWidth).toBeLessThanOrEqual(focusState.stop.clientWidth+1);
 
-    await page.screenshot({
-      path:testInfo.outputPath("04-mobile-live-focus.png")
+    await expect(page.locator(".target-card")).toBeVisible();
+    const mobileLayout=await page.evaluate(()=>{
+      const bounds=(selector)=>{
+        const {left,right,top,bottom,width,height}=document.querySelector(selector).getBoundingClientRect();
+        return{left,right,top,bottom,width,height};
+      };
+      return{
+        scene:bounds(".scene"),
+        camera:bounds(".camera-card"),
+        video:bounds("#camera-stage"),
+        pageWidth:document.documentElement.scrollWidth,
+        viewportWidth:document.documentElement.clientWidth,
+      };
     });
+    // A phone should show the person and flame at once: one compact camera
+    // preview overlays the candle scene instead of sitting below the fold.
+    expect(mobileLayout.camera.left).toBeGreaterThanOrEqual(mobileLayout.scene.left-2);
+    expect(mobileLayout.camera.right).toBeLessThanOrEqual(mobileLayout.scene.right+2);
+    expect(mobileLayout.camera.top).toBeGreaterThanOrEqual(mobileLayout.scene.top-2);
+    expect(mobileLayout.camera.bottom).toBeLessThanOrEqual(mobileLayout.scene.bottom+2);
+    // The inset belongs to the wax-body region, not over the animated flame.
+    expect(mobileLayout.camera.top).toBeGreaterThan(mobileLayout.scene.top+mobileLayout.scene.height*.4);
+    expect(mobileLayout.video.width).toBeGreaterThan(100);
+    expect(mobileLayout.video.height).toBeGreaterThan(70);
+    expect(mobileLayout.pageWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth+1);
+    await page.getByRole("button",{name:"Пауза"}).click();
+    await expect(page.getByRole("button",{name:"Продолжить"})).toBeEnabled();
+    await page.getByRole("button",{name:"Продолжить"}).click();
+    await expect(page.getByRole("button",{name:"Пауза"})).toBeEnabled();
+    await page.screenshot({path:testInfo.outputPath("04-mobile-free-practice.png")});
   }else{
-    expect(mode).toBe("full");
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(0);
     await expect(page.locator(".hero")).toBeVisible();
     await expect(page.locator(".target-card")).toBeVisible();
@@ -106,8 +116,7 @@ test("fake webcam produces an aggregate device-readiness report",async({page},te
   });
 
   await page.goto("/");
-  await completeBriefing(page);
-  await page.getByRole("button",{name:"Start training"}).click();
+  await page.getByRole("button",{name:"Начать упражнение"}).click();
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
   await expect(page.locator("#device-readiness")).toHaveText(/Ready|Constrained|Limited/,{timeout:40000});
