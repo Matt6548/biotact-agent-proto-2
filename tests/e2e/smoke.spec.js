@@ -17,6 +17,9 @@ test("one-screen candle practice opens without any mandatory briefing",async({pa
 });
 
 test("simulation supports unlimited strikes with no stages or score gate",async({page},testInfo)=>{
+  // 25 real UI clicks plus a full-page WebGL screenshot can exceed Playwright's
+  // 30-second default when the fake-camera project uses the GPU in parallel.
+  test.setTimeout(75_000);
   await page.goto("/");
   await page.getByText("История и технические настройки").click();
   await page.getByText("Engineering simulation controls").click();

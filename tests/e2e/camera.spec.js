@@ -85,6 +85,8 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
     expect(mobileLayout.camera.right).toBeLessThanOrEqual(mobileLayout.scene.right+2);
     expect(mobileLayout.camera.top).toBeGreaterThanOrEqual(mobileLayout.scene.top-2);
     expect(mobileLayout.camera.bottom).toBeLessThanOrEqual(mobileLayout.scene.bottom+2);
+    // The inset belongs to the wax-body region, not over the animated flame.
+    expect(mobileLayout.camera.top).toBeGreaterThan(mobileLayout.scene.top+mobileLayout.scene.height*.4);
     expect(mobileLayout.video.width).toBeGreaterThan(100);
     expect(mobileLayout.video.height).toBeGreaterThan(70);
     expect(mobileLayout.pageWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth+1);

@@ -52,8 +52,14 @@ This branch is a first **unmerged** UX and integration prototype, not a producti
 - Browser E2E at prior head `47eba6f`: **PASS in GitHub Actions** (including
   desktop/mobile and fake webcam). Its screenshots exposed a genuine mobile
   ergonomics issue: the camera panel was below the candle, requiring a scroll
-  during practice. The new picture-in-picture layout has added geometry and
-  overflow assertions and still needs a new CI run after pushing this patch.
+  during practice.
+- Browser E2E at `8ffb9fd`: **9 PASS / 2 skipped / 1 timeout**; the mobile
+  fake-camera placement and no-overflow assertions passed. A separate desktop
+  25-click simulation finished its interactions and produced a screenshot but
+  exceeded Playwright's 30-second test budget under parallel GPU load. The
+  simulation test now has a 75-second budget. Screenshot review also prompted
+  moving the camera inset below the flame, over the wax-body region; both
+  updates require a new CI run.
 - Local Playwright Chromium remains blocked by ProcessSingleton socket EPERM;
   this is an execution-environment restriction, not a product test failure.
 - No real device/real camera visual test was performed in this environment.
