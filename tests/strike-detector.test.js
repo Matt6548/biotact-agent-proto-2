@@ -38,3 +38,44 @@ test("refractory window prevents immediate duplicate strike", () => {
   const duplicate = detector.update({ t: 180, speed: 0.2, point: {x:.3,y:0,z:0} });
   assert.equal(duplicate, null);
 });
+
+test("quick in-place fidget is rejected despite high peak speed", () => {
+  const detector = new StrikeDetector();
+  const points = [
+    [0, 0, 0], [33, 2.5, .02], [66, 3.2, -.02],
+    [99, 2.6, .02], [132, .1, 0],
+  ];
+  const events = points.map(([t, speed, x]) => detector.update({ t, speed, point: { x, y: 0, z: 0 } }));
+  assert.equal(events.filter(Boolean).length, 0);
+});
+
+test("guard movement that does not extend away from shoulder is rejected", () => {
+  const detector = new StrikeDetector();
+  const origin = { x: 0, y: 0, z: 0 };
+  const frames = [
+    [0, 0, .4], [33, 2, .35], [66, 3, .29],
+    [99, 2.8, .23], [132, .3, .2],
+  ];
+  const events = frames.map(([t, speed, x]) => detector.update({
+    t, speed, point: { x, y: 0, z: 0 }, origin,
+  }));
+  assert.equal(events.filter(Boolean).length, 0);
+});
+
+test("accepted event includes heuristic quality and displacement, not force", () => {
+  const detector = new StrikeDetector();
+  const origin = { x: -.2, y: 0, z: 0 };
+  const frames = [
+    [0, 0, 0], [33, 2.4, .08], [66, 3, .16],
+    [99, 2.5, .26], [132, .3, .32],
+  ];
+  let strike = null;
+  for (const [t, speed, x] of frames) {
+    strike = detector.update({ t, speed, point: { x, y: 0, z: 0 }, origin }) ?? strike;
+  }
+  assert.ok(strike?.detected);
+  assert.ok(strike.confidence >= 0 && strike.confidence <= 1);
+  assert.ok(strike.displacement >= .3);
+  assert.ok(strike.extension > 0);
+  assert.equal("force" in strike, false);
+});

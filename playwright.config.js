@@ -13,6 +13,11 @@ export default defineConfig({
       use:{...devices["Desktop Chrome"],viewport:{width:1440,height:1000}}
     },
     {
+      name:"candle-visual-chromium",
+      testMatch:/candle-visual\.spec\.js/,
+      use:{...devices["Desktop Chrome"],viewport:{width:1440,height:1000}}
+    },
+    {
       name:"mobile-chromium",
       testMatch:/smoke\.spec\.js/,
       use:{...devices["Pixel 7"]}

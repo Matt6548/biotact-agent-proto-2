@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test("fake webcam initializes private pose runtime and the correct renderer mode",async({page},testInfo)=>{
-  test.setTimeout(45_000);
+  test.setTimeout(75_000);
   const external=[];
   page.on("request",(request)=>{
     const url=new URL(request.url());
@@ -19,6 +19,8 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   await expect(page.locator("#model-backend")).toHaveText(/GPU|CPU/i);
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
   await expect(page.locator("#busy-skips")).toHaveText(/^\d+$/);
+  const cameraHasLiveTrack=()=>page.locator("#camera").evaluate(video=>Boolean(video.srcObject?.getVideoTracks().some(track=>track.readyState==="live")));
+  await expect.poll(cameraHasLiveTrack).toBe(true);
 
   expect(external).toEqual([]);
 
@@ -92,9 +94,15 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
     expect(mobileLayout.pageWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth+1);
     await page.getByRole("button",{name:"Пауза"}).click();
     await expect(page.getByRole("button",{name:"Продолжить"})).toBeEnabled();
+    await expect.poll(cameraHasLiveTrack).toBe(false);
+    await expect(page.locator("#practice-status")).toContainText("камера выключена");
     await page.getByRole("button",{name:"Продолжить"}).click();
     await expect(page.getByRole("button",{name:"Пауза"})).toBeEnabled();
+    await expect.poll(cameraHasLiveTrack).toBe(true);
     await page.screenshot({path:testInfo.outputPath("04-mobile-free-practice.png")});
+    await page.getByRole("button",{name:"Завершить"}).click();
+    await expect.poll(cameraHasLiveTrack).toBe(false);
+    await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeEnabled();
   }else{
     await expect(page.locator("#mini-target-canvas canvas")).toHaveCount(0);
     await expect(page.locator(".hero")).toBeVisible();
@@ -119,7 +127,7 @@ test("fake webcam produces an aggregate device-readiness report",async({page},te
   await page.getByRole("button",{name:"Начать упражнение"}).click();
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
   await expect(page.locator("#inference-ms")).toHaveText(/\d+ ms/,{timeout:20000});
-  await expect(page.locator("#device-readiness")).toHaveText(/Ready|Constrained|Limited/,{timeout:40000});
+  await expect(page.locator("#device-readiness")).toHaveText(/Готово|Нагрузка повышена|Устройство ограничено/,{timeout:40000});
   await expect(page.locator("#device-report-export")).toBeEnabled();
 
   expect(external).toEqual([]);

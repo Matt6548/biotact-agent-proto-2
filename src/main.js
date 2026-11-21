@@ -13,8 +13,8 @@ import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
+import { FreePracticeCameraController } from "./features/free-practice.js";
 import { createCandleTarget } from "./render/candle-target.js";
-import { PoseTracker } from "./vision/pose-tracker.js";
 
 const session=new CandleTrainingSession();
 const analyzer=new LiveTrainingAnalyzer();
@@ -214,8 +214,29 @@ const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector(
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),fieldPackExport=root.querySelector("#field-pack-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false,lastFieldRoundEvidence=null;
 let localPlayer=readLocalPlayer();
-let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null,trainingPaused=false;
+let relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,cameraBusy=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null,trainingPaused=false;
 const practiceStatus=root.querySelector("#practice-status");
+const freePractice=new FreePracticeCameraController({
+  video,
+  onUpdate:updateFreePracticeLive,
+  onStatus:setCameraStatus,
+});
+let practiceTickTimer=null;
+
+function stopPracticeTick(){
+  clearInterval(practiceTickTimer);
+  practiceTickTimer=null;
+}
+function startPracticeTick(){
+  stopPracticeTick();
+  let last=performance.now();
+  practiceTickTimer=setInterval(()=>{
+    if(!cameraStarted||trainingPaused||document.hidden)return;
+    const now=performance.now();
+    candleRenderer.setState(freePractice.tick((now-last)/1000));
+    last=now;
+  },50);
+}
 
 function syncRendererMode(){
   // The candle remains the hero on mobile, even while the camera is on.
@@ -318,9 +339,9 @@ function updateLevel(){
   }
 }
 function updatePrimary(){
-  primaryAction.disabled=false;
-  primaryAction.textContent=!cameraStarted?"Начать упражнение":trainingPaused?"Продолжить":"Пауза";
-  practiceStatus.textContent=!cameraStarted?"Готово к началу":trainingPaused?"Пауза":poseReady?"Свободная тренировка":"Подключаем отслеживание движения";
+  primaryAction.disabled=cameraBusy;
+  primaryAction.textContent=cameraBusy?"Включаем камеру…":!cameraStarted?"Начать упражнение":trainingPaused?"Продолжить":"Пауза";
+  practiceStatus.textContent=!cameraStarted?"Готово к началу":trainingPaused?"Пауза · камера выключена":!poseReady?"Подключаем отслеживание движения":freePractice.snapshot().state==="framing"?"Поправь положение":"Свободная тренировка";
 }
 function syncFieldPackButton(){
   const trace=traceRecorder.export();
@@ -406,7 +427,8 @@ function hapticFor(result){
 }
 
 function drawPose(landmarks){
-  if(!landmarks||!video.videoWidth||!video.videoHeight)return;
+  if(!landmarks){ctx.clearRect(0,0,overlay.width,overlay.height);return;}
+  if(!video.videoWidth||!video.videoHeight)return;
   if(overlay.width!==video.videoWidth||overlay.height!==video.videoHeight){overlay.width=video.videoWidth;overlay.height=video.videoHeight;}
   ctx.clearRect(0,0,overlay.width,overlay.height);ctx.lineWidth=Math.max(2,overlay.width/420);ctx.lineCap="round";ctx.strokeStyle="rgba(241,235,215,.84)";ctx.fillStyle="rgba(255,255,255,.96)";
   for(const[a,b]of CONNECTIONS){const pa=landmarks[a],pb=landmarks[b];if(!pa||!pb||(pa.visibility??0)<.5||(pb.visibility??0)<.5)continue;ctx.beginPath();ctx.moveTo(pa.x*overlay.width,pa.y*overlay.height);ctx.lineTo(pb.x*overlay.width,pb.y*overlay.height);ctx.stroke();}
@@ -425,9 +447,11 @@ function setCameraStatus({state,message,delegate}){
     updatePrimary();
   }else if(state==="privacy-block"){
     setupState.textContent="External SDK request blocked · training data remains local";
+    poseReady=false;
+    if(cameraStarted&&!trainingPaused){showPausedCamera();cameraStatus.dataset.state="error";cameraStatus.textContent=message||"Камера остановлена для безопасности";}
   }else if(state==="error"){
     poseReady=false;
-    if(cameraStarted)setupState.textContent="Motion model failed · stop camera and retry";
+    if(cameraStarted&&!trainingPaused){showPausedCamera();cameraStatus.dataset.state="error";cameraStatus.textContent=message||"Ошибка камеры";}
     updatePrimary();
   }else if(state==="starting"){
     poseReady=false;
@@ -506,6 +530,61 @@ function finishCalibration(){
     :profile.reason==="movement-too-slow"
       ?"Calibration failed · make 3–5 clear comfortable punches"
       :"Calibration failed · keep your full upper body visible";
+  updatePrimary();
+}
+
+// The live UI uses the continuous CV engine. Old round/calibration functions
+// remain isolated for the opt-in engineering demo and trace replay.
+function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCount}){
+  if(!frame)return;
+  if(frame.diagnostics){
+    if(frame.diagnostics.delegate)modelBackendEl.textContent=frame.diagnostics.delegate;
+    inferenceEl.textContent=Number.isFinite(frame.diagnostics.inferenceMs)?`${Math.round(frame.diagnostics.inferenceMs)} ms`:"—";
+    busySkipsEl.textContent=Number.isFinite(frame.diagnostics.busySkipsPerSecond)?String(frame.diagnostics.busySkipsPerSecond):"—";
+    const report=deviceDiagnostics.add({fps:frame.fps,timestampMs:frame.timestampMs,...frame.diagnostics});
+    deviceReadinessEl.textContent=({insufficient:"Собираем данные…",ready:"Готово",constrained:"Нагрузка повышена",limited:"Устройство ограничено"})[report.status]||"Собираем данные…";
+    deviceReadinessEl.dataset.state=report.status;
+    deviceReportExport.disabled=report.status==="insufficient";
+    syncFieldPackButton();
+  }
+  if(traceRecorder.active){
+    traceRecorder.add(frame);
+    traceStatus.textContent=`Recording · ${traceRecorder.frames.length} frames`;
+    if(!traceRecorder.active){
+      traceToggle.textContent="Start motion trace";
+      traceExport.disabled=traceRecorder.frames.length===0;
+      traceStatus.textContent=`Trace capped · ${traceRecorder.frames.length} frames`;
+    }
+  }
+  drawPose(frame.landmarks);
+  if(!analysis?.metrics){
+    cameraCard.dataset.pose="missing";
+    qualityEl.textContent="Человек не найден";
+    setupState.textContent="Встань перед камерой, чтобы были видны плечи и руки";
+    updatePrimary();
+    return;
+  }
+  cameraCard.dataset.pose=state==="practicing"?"ready":"adjust";
+  fpsEl.textContent=String(Math.round(analysis.metrics.fps||0));
+  leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} условн. ед./с`;
+  rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} условн. ед./с`;
+  qualityEl.textContent=analysis.quality.ok?"В кадре":"Поправь положение";
+  setupState.textContent=state==="practicing"
+    ?"Всё готово · двигайся свободно"
+    :"Держи плечи, руки и корпус в кадре";
+  if(strike&&response){
+    const hand=strike.hand==="left"?"Левая":"Правая";
+    candleRenderer.setState(response.flame);
+    candleRenderer.triggerImpulse(response.visualImpulse);
+    flameState.textContent=response.flame.extinguished?"Пламя погасло":response.flame.instability>.65?"Пламя колеблется":"Пламя движется";
+    score.textContent=response.visualImpulse.toFixed(2);
+    lastStrike.textContent=`${hand} рука · относительное движение`;
+    roundCount.textContent=String(strikeCount);
+    hitFeedback.textContent=response.flame.extinguished?"Пламя погасло":"Движение зафиксировано";
+    hitFeedback.classList.remove("show");void hitFeedback.offsetWidth;hitFeedback.classList.add("show");
+    clearTimeout(hitTimer);hitTimer=setTimeout(()=>hitFeedback.classList.remove("show"),1100);
+    if(navigator.vibrate)navigator.vibrate(response.flame.extinguished?[28,18,36]:18);
+  }
   updatePrimary();
 }
 
@@ -590,28 +669,28 @@ async function startCameraFlow(){
   deviceReadinessEl.textContent="Collecting…";
   deviceReadinessEl.dataset.state="insufficient";
   deviceReportExport.disabled=true;
-  primaryAction.disabled=true;primaryAction.textContent="Включаем камеру…";
+  cameraBusy=true;updatePrimary();
   try{
-    analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
+    if(round.active)round.reset();
+    freePractice.stop();
+    poseReady=false;
+    await freePractice.start();
     cameraStarted=true;trainingPaused=false;calibrated=false;cameraCard.dataset.camera="on";cameraCard.dataset.pose="loading";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
-    startRound();
+    resetCandleOnly();score.textContent="—";lastStrike.textContent="Ожидание";
+    coachOutcome.textContent="Двигайся в своём темпе. Нет уровней и ограничения ударов.";
+    coachCues.innerHTML="";
+    startPracticeTick();
     syncRendererMode();
     setupState.textContent=poseReady?"Камера готова · двигайся свободно":"Камера включена · загружаем распознавание…";
   }catch(error){
+    freePractice.stop();
+    stopPracticeTick();
     setCameraStatus({state:"error",message:error?.message||"Camera failed"});
-    setupState.textContent="Camera permission or device unavailable";
+    setupState.textContent="Нет доступа к камере. Проверь разрешение и попробуй снова.";
     cameraStarted=false;
     lab.dataset.live="off";
   }
-  updatePrimary();
-}
-function runCalibration(){
-  if(!tracker||!poseReady||!poseReadiness.ready||calibrating)return;
-  analyzer.startCalibration();
-  calibrationClock.start();
-  calibrating=true;
-  setupState.textContent="Move now · 5.0 s valid";
-  updatePrimary();
+  cameraBusy=false;updatePrimary();
 }
 function startRound({simulation=false}={}){
   round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;updateRound();
@@ -619,11 +698,43 @@ function startRound({simulation=false}={}){
   coachCues.innerHTML="";resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";
 }
 
-primaryAction.addEventListener("click",()=>{
-  if(!cameraStarted){startCameraFlow();return;}
-  trainingPaused=!trainingPaused;
-  analyzer.resetMotionState();
+function showPausedCamera(){
+  stopPracticeTick();
+  trainingPaused=true;
+  cameraCard.dataset.camera="off";
+  cameraCard.dataset.pose="off";
+  cameraStatus.dataset.state="idle";
+  cameraStatus.textContent="Камера на паузе";
+  cameraEmpty.querySelector("strong").textContent="Камера на паузе";
+  cameraEmpty.querySelector("span").textContent="Нажми «Продолжить», чтобы снова включить камеру.";
+  cameraEmpty.hidden=false;
+  setupState.textContent="Движения не отслеживаются · камера выключена";
   updatePrimary();
+}
+primaryAction.addEventListener("click",async()=>{
+  if(!cameraStarted){startCameraFlow();return;}
+  if(!trainingPaused){freePractice.pause();showPausedCamera();return;}
+  cameraBusy=true;updatePrimary();
+  try{
+    poseReady=false;
+    await freePractice.resume();
+    trainingPaused=false;
+    cameraCard.dataset.camera="on";
+    cameraCard.dataset.pose="loading";
+    cameraEmpty.hidden=true;
+    startPracticeTick();
+  }catch(error){
+    showPausedCamera();
+    cameraStatus.dataset.state="error";
+    cameraStatus.textContent=error?.message||"Не удалось включить камеру";
+  }
+  cameraBusy=false;updatePrimary();
+});
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden&&cameraStarted&&!trainingPaused){
+    freePractice.pause();
+    showPausedCamera();
+  }
 });
 stopCamera.addEventListener("click",()=>{
   if(traceRecorder.active){
@@ -637,9 +748,13 @@ stopCamera.addEventListener("click",()=>{
     calibrationClock.reset();
   }
   poseReadiness.reset();
-  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;trainingPaused=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
+  freePractice.stop();stopPracticeTick();analyzer.reset();cameraStarted=false;cameraBusy=false;trainingPaused=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
   syncRendererMode();
+  resetCandleOnly();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
+  cameraEmpty.querySelector("strong").textContent="Камера пока выключена";
+  cameraEmpty.querySelector("span").textContent="Включится только после нажатия «Начать упражнение».";
+  cameraStatus.dataset.state="idle";cameraStatus.textContent="Камера выключена";
   stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";modelBackendEl.textContent="—";inferenceEl.textContent="—";busySkipsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Камера не запущена";
   if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;coachOutcome.textContent="Упражнение завершено. Можно начать снова.";coachCues.innerHTML="";}
   updateRound();
@@ -655,7 +770,7 @@ root.querySelector("#controls").addEventListener("submit",(event)=>{
   if(round.active)processStrike(strike,{recordHistory:false,haptic:false});
   else renderFlame(session.strike({speed:Number(speed.value),alignment:straightness,distance:Number(distance.value)}),"Simulation");
 });
-root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightTimer);resetCandleOnly();score.textContent="—";lastStrike.textContent="Ожидание";coachOutcome.textContent=round.active?"Свободная тренировка продолжается.":"Начни упражнение, когда будешь готов.";coachCues.innerHTML="";});
+root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightTimer);if(cameraStarted)freePractice.relight();resetCandleOnly();score.textContent="—";lastStrike.textContent="Ожидание";coachOutcome.textContent=cameraStarted||round.active?"Свободная тренировка продолжается.":"Начни упражнение, когда будешь готов.";coachCues.innerHTML="";});
 root.querySelector("#clear-history").addEventListener("click",()=>{attempts=[];writeHistory();renderHistory();});
 
 traceToggle.addEventListener("click",()=>{
