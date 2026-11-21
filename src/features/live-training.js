@@ -4,6 +4,8 @@ import { StrikeDetector } from "../core/strike-detector.js";
 
 const KEY={leftShoulder:11,rightShoulder:12,leftElbow:13,rightElbow:14,leftWrist:15,rightWrist:16,leftHip:23,rightHip:24};
 const ESSENTIAL=Object.values(KEY);
+const MAX_TRACKING_GAP_MS=180;
+const MAX_PLAUSIBLE_WRIST_SPEED=9;
 
 function hasPoint(point){
   return point&&Number.isFinite(point.x)&&Number.isFinite(point.y)&&Number.isFinite(point.z);
@@ -17,6 +19,8 @@ export class LiveTrainingAnalyzer{
     this.calibration=new SpeedCalibration();
     this.profile=null;
     this.trackingValid=false;
+    this.lastTimestampMs=null;
+    this.lastEmittedAt=-Infinity;
   }
 
   resetMotionState(){
@@ -26,6 +30,8 @@ export class LiveTrainingAnalyzer{
     this.speedFilters.right.reset();
     this.previous={left:null,right:null};
     this.trackingValid=false;
+    this.lastTimestampMs=null;
+    this.lastEmittedAt=-Infinity;
   }
 
   reset(){
@@ -74,6 +80,24 @@ export class LiveTrainingAnalyzer{
     const missingWrist=!hasPoint(leftWorld)||!hasPoint(rightWorld);
     const quality=qualityGate({visibility,fps,bodyCoverage});
 
+    // Global mean visibility can hide an occluded striking hand.
+    if([KEY.leftWrist,KEY.rightWrist,KEY.leftElbow,KEY.rightElbow]
+      .some((index)=>(landmarks[index]?.visibility??0)<.65)){
+      quality.ok=false;
+      quality.reasons.push("arm-occluded");
+    }
+
+    if(!Number.isFinite(timestampMs)){
+      quality.ok=false;
+      quality.reasons.push("invalid-timestamp");
+    }else if(this.lastTimestampMs!==null){
+      const delta=timestampMs-this.lastTimestampMs;
+      if(delta<=0||delta>MAX_TRACKING_GAP_MS){
+        quality.ok=false;
+        quality.reasons.push("tracking-gap");
+      }
+    }
+
     if(missingWrist){
       quality.ok=false;
       quality.reasons=[...quality.reasons,"missing-wrist-world"];
@@ -107,6 +131,7 @@ export class LiveTrainingAnalyzer{
       this.previous.left=leftPoint;
       this.previous.right=rightPoint;
       this.trackingValid=true;
+      this.lastTimestampMs=timestampMs;
       return{
         quality,
         metrics:{
@@ -129,22 +154,38 @@ export class LiveTrainingAnalyzer{
 
     const rawLeftSpeed=velocityBetween(this.previous.left,leftPoint);
     const rawRightSpeed=velocityBetween(this.previous.right,rightPoint);
+    if(rawLeftSpeed>MAX_PLAUSIBLE_WRIST_SPEED||rawRightSpeed>MAX_PLAUSIBLE_WRIST_SPEED){
+      this.resetMotionState();
+      return{
+        quality:{ok:false,reasons:["implausible-wrist-jump"]},
+        metrics:null,strike:null,calibrating:this.calibration.active,
+        profile:this.profile,trackingReset:true,
+      };
+    }
     const leftSpeed=this.speedFilters.left.push(rawLeftSpeed);
     const rightSpeed=this.speedFilters.right.push(rawRightSpeed);
     const maxWristSpeed=Math.max(leftSpeed,rightSpeed);
 
     if(this.calibration.active)this.calibration.add(maxWristSpeed);
 
-    const leftStrike=this.calibration.active?null:this.detectors.left.update({t:timestampMs,speed:leftSpeed,point:leftPoint});
-    const rightStrike=this.calibration.active?null:this.detectors.right.update({t:timestampMs,speed:rightSpeed,point:rightPoint});
+    const leftStrike=this.calibration.active?null:this.detectors.left.update({
+      t:timestampMs,speed:leftSpeed,point:leftPoint,origin:worldLandmarks[KEY.leftShoulder],
+    });
+    const rightStrike=this.calibration.active?null:this.detectors.right.update({
+      t:timestampMs,speed:rightSpeed,point:rightPoint,origin:worldLandmarks[KEY.rightShoulder],
+    });
 
     this.previous.left=leftPoint;
     this.previous.right=rightPoint;
+    this.lastTimestampMs=timestampMs;
 
-    const strike=this.calibration.active?null:[
+    const candidate=this.calibration.active?null:[
       leftStrike&&{...leftStrike,hand:"left"},
       rightStrike&&{...rightStrike,hand:"right"},
     ].filter(Boolean).sort((a,b)=>b.peakSpeed-a.peakSpeed)[0]??null;
+    // Do not count the second arm or a trailing release as a separate strike.
+    const strike=candidate&&timestampMs-this.lastEmittedAt>=300?candidate:null;
+    if(strike)this.lastEmittedAt=timestampMs;
 
     return{
       quality,

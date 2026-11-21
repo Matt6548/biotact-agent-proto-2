@@ -1,15 +1,5 @@
 import { test, expect } from "@playwright/test";
 
-async function completeBriefing(page,name="Test Player"){
-  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toBeVisible();
-  await page.locator("#player-name-input").fill(name);
-  await page.locator("#safety-ack").check();
-  await expect(page.getByRole("button",{name:"Enter training"})).toBeEnabled();
-  await page.getByRole("button",{name:"Enter training"}).click();
-  await expect(page.locator("#mission-gate")).toBeHidden();
-}
-
-
 test("WebGL failure falls back without losing the training flow",async({page})=>{
   await page.addInitScript(()=>{
     const native=HTMLCanvasElement.prototype.getContext;
@@ -20,10 +10,10 @@ test("WebGL failure falls back without losing the training flow",async({page})=>
   });
 
   await page.goto("/");
-  await completeBriefing(page);
   await expect(page.locator("#target-canvas")).toHaveAttribute("data-renderer-kind","fallback");
   await expect(page.locator(".fallback-target")).toBeVisible();
 
+  await page.getByText("История и технические настройки").click();
   await page.getByText("Engineering simulation controls").click();
   await page.getByRole("button",{name:"Simulate strike"}).click();
   await expect(page.locator("#score")).not.toHaveText("—");
@@ -39,10 +29,11 @@ test("camera permission failure returns to a retryable state",async({page})=>{
   });
 
   await page.goto("/");
-  await completeBriefing(page);
-  await page.getByRole("button",{name:"Start training"}).click();
+  await page.getByRole("button",{name:"Начать упражнение"}).click();
 
-  await expect(page.locator("#setup-state")).toContainText(/permission|unavailable/i);
-  await expect(page.getByRole("button",{name:"Start training"})).toBeEnabled();
+  // The user-facing camera error is localized, while the underlying browser
+  // error is still available in the technical status for diagnosis.
+  await expect(page.locator("#setup-state")).toContainText(/Нет доступа|разрешени|permission|unavailable/i);
+  await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeEnabled();
   await expect(page.locator("#camera-status")).toContainText(/permission|denied/i);
 });
