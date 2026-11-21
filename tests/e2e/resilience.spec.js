@@ -31,7 +31,9 @@ test("camera permission failure returns to a retryable state",async({page})=>{
   await page.goto("/");
   await page.getByRole("button",{name:"Начать упражнение"}).click();
 
-  await expect(page.locator("#setup-state")).toContainText(/permission|unavailable/i);
+  // The user-facing camera error is localized, while the underlying browser
+  // error is still available in the technical status for diagnosis.
+  await expect(page.locator("#setup-state")).toContainText(/Нет доступа|разрешени|permission|unavailable/i);
   await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeEnabled();
   await expect(page.locator("#camera-status")).toContainText(/permission|denied/i);
 });
