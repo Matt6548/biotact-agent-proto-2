@@ -455,7 +455,11 @@ function setCameraStatus({state,message,delegate}){
     updatePrimary();
   }else if(state==="starting"){
     poseReady=false;
-    setupState.textContent="Starting camera…";
+    setupState.textContent="Запрашиваем доступ к камере…";
+    updatePrimary();
+  }else if(state==="loading"){
+    poseReady=false;
+    setupState.textContent="Камера включена · загружаем распознавание…";
     updatePrimary();
   }
 }

@@ -80,3 +80,37 @@ test("worker initialization failure closes already granted camera tracks", async
     else delete globalThis.Worker;
   }
 });
+
+test("camera status switches from permission request to model loading once video plays", async () => {
+  const priorNavigator = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  const priorWorker = Object.getOwnPropertyDescriptor(globalThis, "Worker");
+  let stopped = 0;
+  const stream = { getTracks: () => [{ stop: () => stopped++ }] };
+  const states = [];
+  Object.defineProperty(globalThis, "navigator", {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => stream } },
+  });
+  Object.defineProperty(globalThis, "Worker", {
+    configurable: true,
+    value: class {
+      postMessage(message) { assert.equal(message.type, "init"); }
+      terminate() {}
+    },
+  });
+  try {
+    const video = { srcObject: null, async play() {} };
+    const tracker = new PoseTracker({ video, onStatus: ({ state }) => states.push(state) });
+    tracker.scheduleFrame = () => {};
+    await tracker.start();
+    assert.deepEqual(states, ["starting", "loading"]);
+    assert.equal(video.srcObject, stream);
+    tracker.stop();
+    assert.equal(stopped, 1);
+  } finally {
+    if (priorNavigator) Object.defineProperty(globalThis, "navigator", priorNavigator);
+    else delete globalThis.navigator;
+    if (priorWorker) Object.defineProperty(globalThis, "Worker", priorWorker);
+    else delete globalThis.Worker;
+  }
+});

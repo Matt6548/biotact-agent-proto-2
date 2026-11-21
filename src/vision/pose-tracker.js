@@ -23,7 +23,7 @@ export class PoseTracker {
     }
 
     const generation = ++this.generation;
-    this.onStatus?.({ state: "starting", message: "Requesting camera…" });
+    this.onStatus?.({ state: "starting", message: "Запрашиваем доступ к камере…" });
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -47,6 +47,10 @@ export class PoseTracker {
       throw error;
     }
     if (generation !== this.generation) throw new DOMException("Camera request cancelled", "AbortError");
+
+    // The video can already be visible while the heavier on-device pose model
+    // is still loading. Keep these two states distinct in the UI.
+    this.onStatus?.({ state: "loading", message: "Камера включена · загружаем распознавание…" });
 
     try {
       this.worker = new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" });
