@@ -99,7 +99,7 @@ root.innerHTML=`
 
   <section class="live-grid">
     <article class="target-card">
-      <div class="target-head"><h2>Свеча</h2><button class="text-button" id="reset" type="button">Зажечь снова</button></div>
+      <div class="target-head"><h2>Свеча</h2><div class="target-actions"><button class="text-button" id="inspect-camera" type="button">Настроить камеру</button><button class="text-button" id="reset" type="button">Зажечь снова</button></div></div>
       <div class="scene" aria-label="Virtual candle"><div id="target-canvas" class="target-canvas"></div><div id="hit-feedback" class="hit-feedback" aria-live="polite"></div><div class="target-overlay"><span id="flame-state" aria-live="polite">Пламя спокойно</span><small>Повернуть · приблизить</small></div></div>
       <details class="practice-stats"><summary>Подробнее о движении</summary>
       <div class="strike-result" aria-live="polite"><div><span>Условный отклик</span><strong id="score">—</strong></div><div><span>Последнее движение</span><strong id="last-strike">Ожидание</strong></div></div>
@@ -110,7 +110,7 @@ root.innerHTML=`
       </details>
     </article>
     <article class="camera-card" id="camera-card" data-camera="off">
-      <div class="camera-head"><h2>Камера движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span></div>
+      <div class="camera-head"><h2>Настройка движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span><button class="text-button back-to-candle" id="back-to-candle" type="button">К свече ↑</button></div>
       <div class="camera-stage" id="camera-stage">
         <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
         <div class="frame-guide" aria-hidden="true"><span>Держи плечи и корпус в кадре</span></div>
@@ -206,6 +206,12 @@ let miniCandleRenderer=null;
 const miniTargetContainer=root.querySelector("#mini-target-canvas");
 const video=root.querySelector("#camera"),overlay=root.querySelector("#pose-overlay"),ctx=overlay.getContext("2d");
 const cameraCard=root.querySelector("#camera-card"),cameraEmpty=root.querySelector("#camera-empty");
+root.querySelector("#inspect-camera").addEventListener("click",()=>{
+  cameraCard.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+});
+root.querySelector("#back-to-candle").addEventListener("click",()=>{
+  root.querySelector(".scene").scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+});
 const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelector("#camera-status"),setupState=root.querySelector("#setup-state"),primaryAction=root.querySelector("#primary-action");
 const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),deviceReadinessEl=root.querySelector("#device-readiness"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");

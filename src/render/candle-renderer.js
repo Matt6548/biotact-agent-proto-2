@@ -25,7 +25,8 @@ export class CandleRenderer {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-    this.camera.position.set(3.2, 2.55, 5.4);
+    // A natural, almost eye-level frontal view: the candle stands ahead of us.
+    this.camera.position.set(0.45, 1.82, 5.25);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -41,7 +42,7 @@ export class CandleRenderer {
     this.controls.enablePan = false;
     this.controls.minDistance = 4.1;
     this.controls.maxDistance = 7.4;
-    this.controls.minPolarAngle = 0.72;
+    this.controls.minPolarAngle = 1.0;
     this.controls.maxPolarAngle = 1.48;
     this.controls.target.set(0, 0.72, 0);
 
@@ -54,8 +55,8 @@ export class CandleRenderer {
   }
 
   makeScene() {
-    this.scene.add(new THREE.HemisphereLight(0xf2e7d4, 0x1f252e, 1.25));
-    const key = new THREE.DirectionalLight(0xffecd2, 2.05);
+    this.scene.add(new THREE.HemisphereLight(0xf2e7d4, 0x1f252e, 1.05));
+    const key = new THREE.DirectionalLight(0xffecd2, 1.7);
     key.position.set(3, 5, 4);
     key.castShadow = true;
     key.shadow.mapSize.set(512, 512);
@@ -65,13 +66,13 @@ export class CandleRenderer {
     key.shadow.camera.bottom = -3;
     key.shadow.normalBias = 0.025;
     this.scene.add(key);
-    const rim = new THREE.DirectionalLight(0x93a8cc, 0.75);
+    const rim = new THREE.DirectionalLight(0x93a8cc, 0.5);
     rim.position.set(-4, 2.7, -3);
     this.scene.add(rim);
 
     const floor = new THREE.Mesh(
       new THREE.CircleGeometry(3.5, 64),
-      new THREE.MeshStandardMaterial({ color: 0x191b20, roughness: 0.97 }),
+      new THREE.MeshStandardMaterial({ color: 0x201c19, roughness: 0.97 }),
     );
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -1.23;
@@ -162,12 +163,12 @@ export class CandleRenderer {
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.9, 10, 16), glowMaterial);
     glow.renderOrder = 2;
     this.flameGroup.add(glow);
-    this.flamePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 1.30, 14, 24), flameMaterial);
+    this.flamePlane = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.30, 14, 24), flameMaterial);
     this.flamePlane.renderOrder = 3;
     this.flameGroup.add(this.flamePlane);
     this.scene.add(this.flameGroup);
 
-    this.flameLight = new THREE.PointLight(0xff9c46, 2.0, 3.8, 2);
+    this.flameLight = new THREE.PointLight(0xffa653, 2.3, 3.8, 2);
     this.flameLight.position.set(0, 1.63, 0.11);
     this.scene.add(this.flameLight);
 
@@ -274,7 +275,7 @@ export class CandleRenderer {
       positions[i * 3 + 2] = seed.depth + Math.cos(elapsed * 9 + seed.phase) * 0.025 * this.airPulseStrength;
     }
     this.airGeometry.attributes.position.needsUpdate = true;
-    this.airMaterial.opacity = Math.sin(Math.PI * progress) * 0.24 * Math.min(1, this.airPulseStrength);
+    this.airMaterial.opacity = Math.sin(Math.PI * progress) * 0.08 * Math.min(1, this.airPulseStrength);
   }
 
   resize() {
@@ -327,7 +328,7 @@ export class CandleRenderer {
     this.flameGroup.quaternion.copy(this.camera.quaternion);
     const alive = this.flameUniforms.uAlive.value;
     const flicker = 0.93 + 0.055 * Math.sin(elapsed * 12.7) + 0.025 * Math.sin(elapsed * 8.1);
-    this.flameLight.intensity = 2.0 * flicker * alive * (1 + this.impactLife * 0.10);
+    this.flameLight.intensity = 2.3 * flicker * alive * (1 + this.impactLife * 0.10);
     this.flameLight.position.x = Math.sin(elapsed * 7.1) * 0.035 * (1 + this.flameUniforms.uInstability.value);
     this.ember.visible = alive > 0.05;
 
