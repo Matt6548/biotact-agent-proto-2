@@ -9,10 +9,10 @@ void main() {
   vUv = uv;
   vec3 p = position;
   float rise = smoothstep(0.0, 1.0, uv.y);
-  float wobble = sin(uTime * 7.4 + uv.y * 11.0) * 0.026
-               + sin(uTime * 11.3 - uv.y * 18.0) * 0.012;
-  p.x += rise * rise * (uTilt * 0.35 + wobble * (0.35 + uInstability * 1.8 + uImpact));
-  p.y += sin(uTime * 8.1 + uv.x * 3.0) * rise * 0.012 * (uInstability + uImpact);
+  float wobble = sin(uTime * 5.6 + uv.y * 9.5) * 0.018
+               + sin(uTime * 10.7 - uv.y * 15.0) * 0.008;
+  p.x += rise * rise * (uTilt * 0.34 + wobble * (0.3 + uInstability * 1.4 + uImpact));
+  p.y += sin(uTime * 7.2 + uv.x * 3.0) * rise * 0.010 * (uInstability + uImpact);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
 
@@ -25,21 +25,25 @@ uniform float uAlive;
 void main() {
   float y = clamp(vUv.y, 0.0, 1.0);
   float x = abs(vUv.x - 0.5);
-  float bell = pow(max(0.0, sin(3.14159265 * y)), 0.82);
-  float width = 0.055 + 0.36 * bell * (1.0 - 0.20 * y);
-  width += (sin(uTime * 6.9 + y * 23.0) * 0.013 + sin(uTime * 11.0 - y * 31.0) * 0.008)
-           * (0.4 + uInstability + 0.7 * uImpact) * bell;
-  float normalized = x / max(width, 0.025);
-  float contour = 1.0 - smoothstep(0.75, 1.04, normalized);
-  float ends = smoothstep(0.0, 0.055, y) * (1.0 - smoothstep(0.955, 1.0, y));
-  float core = 1.0 - smoothstep(0.05, 0.62, normalized);
-  vec3 amber = vec3(1.0, 0.32, 0.055);
-  vec3 golden = vec3(1.0, 0.78, 0.25);
-  vec3 ivory = vec3(1.0, 0.97, 0.77);
-  vec3 color = mix(amber, golden, 0.35 + 0.52 * smoothstep(0.09, 0.70, y));
-  color = mix(color, ivory, core * 0.84 * smoothstep(0.10, 0.45, y) * (1.0 - smoothstep(0.8, 1.0, y)));
-  color = mix(vec3(0.18, 0.39, 0.95), color, smoothstep(0.015, 0.18, y));
-  float breathe = 0.96 + 0.04 * sin(uTime * 8.5 + y * 8.0);
+  // Tapered buoyant plume: narrow near the wick, a luminous lower body,
+  // and a soft asymmetric tip. This is a visual approximation, not CFD.
+  float bell = pow(max(0.0, sin(3.14159265 * y)), 0.88);
+  float tip = 1.0 - 0.37 * smoothstep(0.43, 1.0, y);
+  float width = 0.025 + 0.285 * bell * tip;
+  width += (sin(uTime * 6.4 + y * 21.0) * 0.008 + sin(uTime * 9.8 - y * 29.0) * 0.005)
+           * (0.3 + uInstability + 0.65 * uImpact) * bell;
+  float normalized = x / max(width, 0.02);
+  float contour = 1.0 - smoothstep(0.71, 1.07, normalized);
+  float ends = smoothstep(0.0, 0.045, y) * (1.0 - smoothstep(0.962, 1.0, y));
+  float core = exp(-4.5 * normalized * normalized);
+  float centreHeat = core * smoothstep(0.04, 0.25, y) * (1.0 - smoothstep(0.7, 0.98, y));
+  vec3 ember = vec3(0.95, 0.24, 0.035);
+  vec3 gold = vec3(1.0, 0.67, 0.17);
+  vec3 whiteHot = vec3(1.0, 0.965, 0.76);
+  vec3 color = mix(ember, gold, 0.45 + 0.35 * smoothstep(0.06, 0.74, y));
+  color = mix(color, whiteHot, centreHeat * 0.93);
+  color = mix(vec3(0.13, 0.31, 0.79), color, smoothstep(0.035, 0.105, y));
+  float breathe = 0.975 + 0.025 * sin(uTime * 7.2 + y * 6.0);
   float alpha = contour * ends * breathe * uAlive;
   if (alpha < 0.008) discard;
   gl_FragColor = vec4(color, alpha);

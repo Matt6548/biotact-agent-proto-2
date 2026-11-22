@@ -340,3 +340,69 @@ body.briefing-open{overflow:hidden}
   .lab[data-live="on"] .arena-status{margin-bottom:5px;padding-top:6px;padding-bottom:7px}
   .lab[data-live="on"] .camera-card{right:9px;width:min(40%,150px)}
 }
+
+/* Immersive free practice: the candle is the stage; camera is a setup tool.
+   Keep the actual video visible in the document for local pose processing. */
+.live-grid,.lab[data-live="on"] .live-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:20px;
+  align-items:start;
+}
+.target-card,.lab[data-live="on"] .target-card{order:0}
+.camera-card,.lab[data-live="on"] .camera-card{
+  order:1;
+  width:min(100%,550px);
+  margin:0 auto;
+  padding:14px;
+}
+.target-actions{display:flex;gap:22px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.target-actions .text-button{white-space:nowrap}
+.camera-head .back-to-candle{margin-left:auto;white-space:nowrap;font-size:.78rem;color:#e4d4ac}
+.scene{
+  min-height:min(76svh,770px);
+  background:radial-gradient(ellipse at 50% 40%,#28251e 0%,#171714 42%,#0b0c0a 85%);
+  box-shadow:inset 0 0 90px rgba(0,0,0,.19);
+}
+.camera-stage{aspect-ratio:16/9}
+@media(max-width:900px){
+  .lab[data-live="on"] .live-grid{position:static}
+  .lab[data-live="on"] .camera-card{
+    position:relative;
+    bottom:auto;
+    right:auto;
+    z-index:auto;
+    width:min(100%,550px);
+    min-width:0;
+    margin:0 auto;
+    border:1px solid #30322c;
+    background:#151612;
+    box-shadow:none;
+  }
+  .lab[data-live="on"] .camera-head{flex-direction:row;align-items:center;gap:12px;margin-bottom:12px}
+  .lab[data-live="on"] .camera-head h2{font-size:.9rem}
+  .lab[data-live="on"] .status-pill{max-width:38%}
+  .lab[data-live="on"] .camera-stage{aspect-ratio:16/9}
+  .lab[data-live="on"] .setup-line{padding:12px 2px 4px;gap:12px}
+  .lab[data-live="on"] .setup-line>div,
+  .lab[data-live="on"] .tracking-details,
+  .lab[data-live="on"] .camera-note{display:block}
+  .lab[data-live="on"] #stop-camera{
+    width:auto;
+    min-width:108px;
+    min-height:44px;
+    padding:4px 12px;
+  }
+}
+@media(max-width:600px){
+  .scene{min-height:min(70svh,610px)}
+  .target-head{gap:8px}
+  .target-actions{gap:10px}
+  .target-actions .text-button{font-size:.77rem}
+  .lab[data-live="on"] .camera-card{right:auto;width:100%;padding:12px}
+  .lab[data-live="on"] .camera-head{gap:8px;flex-wrap:wrap}
+  .lab[data-live="on"] .camera-head h2{font-size:.85rem}
+  .lab[data-live="on"] .status-pill{font-size:.67rem;min-width:0;max-width:36%}
+  .lab[data-live="on"] .back-to-candle{font-size:.72rem}
+  .lab[data-live="on"] .frame-guide span{display:block}
+}

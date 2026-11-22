@@ -81,17 +81,17 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
         viewportWidth:document.documentElement.clientWidth,
       };
     });
-    // A phone should show the person and flame at once: one compact camera
-    // preview overlays the candle scene instead of sitting below the fold.
-    expect(mobileLayout.camera.left).toBeGreaterThanOrEqual(mobileLayout.scene.left-2);
-    expect(mobileLayout.camera.right).toBeLessThanOrEqual(mobileLayout.scene.right+2);
-    expect(mobileLayout.camera.top).toBeGreaterThanOrEqual(mobileLayout.scene.top-2);
-    expect(mobileLayout.camera.bottom).toBeLessThanOrEqual(mobileLayout.scene.bottom+2);
-    // The inset belongs to the wax-body region, not over the animated flame.
-    expect(mobileLayout.camera.top).toBeGreaterThan(mobileLayout.scene.top+mobileLayout.scene.height*.4);
+    // The camera is an accessible setup panel *after* the candle, not a
+    // picture-in-picture overlay hiding the virtual flame.
+    expect(mobileLayout.camera.top).toBeGreaterThanOrEqual(mobileLayout.scene.bottom-2);
+    expect(mobileLayout.camera.left).toBeGreaterThanOrEqual(-2);
+    expect(mobileLayout.camera.right).toBeLessThanOrEqual(mobileLayout.viewportWidth+2);
+    expect(mobileLayout.scene.height).toBeGreaterThan(260);
     expect(mobileLayout.video.width).toBeGreaterThan(100);
     expect(mobileLayout.video.height).toBeGreaterThan(70);
     expect(mobileLayout.pageWidth).toBeLessThanOrEqual(mobileLayout.viewportWidth+1);
+    await page.getByRole("button",{name:"Настроить камеру"}).click();
+    await expect(page.locator(".camera-card")).toBeInViewport({timeout:5000});
     await page.getByRole("button",{name:"Пауза"}).click();
     await expect(page.getByRole("button",{name:"Продолжить"})).toBeEnabled();
     await expect.poll(cameraHasLiveTrack).toBe(false);

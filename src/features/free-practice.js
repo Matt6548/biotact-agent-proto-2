@@ -94,6 +94,8 @@ export class FreePracticeEngine {
         impulse: visualImpulse,
         alignment: strike.straightness,
         distance: this.virtualDistance,
+        // Handedness is only a visual direction cue, not measured air flow.
+        direction: strike.hand === "left" ? -1 : 1,
       });
       response = {
         flame,
