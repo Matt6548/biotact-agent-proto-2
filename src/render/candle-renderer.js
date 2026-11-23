@@ -288,7 +288,7 @@ export class CandleRenderer {
     this.airPulseLife = 0;
     this.impactLife = 0;
     this.flameUniforms.uAlive.value = 1;
-    this.floorLightUniforms.uAlive.value = 1;
+    if (this.floorLightUniforms) this.floorLightUniforms.uAlive.value = 1;
     this.flameUniforms.uTilt.value = 0;
     this.flameUniforms.uInstability.value = 0;
     this.flameUniforms.uImpact.value = 0;
