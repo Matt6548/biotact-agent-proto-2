@@ -97,7 +97,7 @@ export class PoseTracker {
       this.modelReady = true;
       this.onStatus?.({
         state: "ready",
-        message: `Pose model ready · ${this.delegate}`,
+        message: data.mode === "hands" ? `Hand model ready · ${this.delegate}` : `Pose model ready · ${this.delegate}`,
         delegate: this.delegate,
         mode: data.mode || "pose",
         initMs: Number.isFinite(data.initMs) ? data.initMs : null,
