@@ -142,3 +142,14 @@ test("optional injected worker uses the same exclusive camera and stop cleanup",
     else delete globalThis.navigator;
   }
 });
+
+test("hand-ready status exposes delegate and model init time without touching the camera",()=>{
+ const events=[];
+ const tracker=new PoseTracker({video:{},onStatus:(event)=>events.push(event)});
+ tracker.handleWorkerMessage({type:"ready",mode:"hands",delegate:"CPU",initMs:82});
+ assert.equal(events.length,1);
+ assert.equal(events[0].mode,"hands");
+ assert.equal(events[0].initMs,82);
+ assert.equal(events[0].delegate,"CPU");
+ assert.match(events[0].message,/Hand model ready/);
+});
