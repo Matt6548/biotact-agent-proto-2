@@ -54,7 +54,7 @@ export default defineConfig({
     },
     {
       name:"resilience-chromium",
-      testMatch:/resilience\.spec\.js/,
+      testMatch:/(resilience|trace-import)\.spec\.js/,
       use:{...devices["Desktop Chrome"]}
     }
   ],
