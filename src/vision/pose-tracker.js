@@ -13,15 +13,18 @@ export class PoseTracker {
     this.busySkipTimes = [];
     this.delegate = null;
     this.modelReady = false;
+    this.generation = 0;
   }
 
   async start() {
+    if (this.running || this.stream) throw new Error("Camera is already active.");
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error("Camera API is unavailable in this browser.");
     }
 
-    this.onStatus?.({ state: "starting", message: "Requesting camera…" });
-    this.stream = await navigator.mediaDevices.getUserMedia({
+    const generation = ++this.generation;
+    this.onStatus?.({ state: "starting", message: "Запрашиваем доступ к камере…" });
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
         facingMode: "user",
@@ -30,22 +33,43 @@ export class PoseTracker {
         frameRate: { ideal: 30, max: 60 },
       },
     });
+    if (generation !== this.generation) {
+      stream.getTracks().forEach((track) => track.stop());
+      throw new DOMException("Camera request cancelled", "AbortError");
+    }
 
-    this.video.srcObject = this.stream;
-    await this.video.play();
+    this.stream = stream;
+    try {
+      this.video.srcObject = stream;
+      await this.video.play();
+    } catch (error) {
+      if (generation === this.generation) this.stop();
+      throw error;
+    }
+    if (generation !== this.generation) throw new DOMException("Camera request cancelled", "AbortError");
 
-    this.worker = new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" });
-    this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
-    this.worker.onerror = (event) => {
-      this.onStatus?.({ state: "error", message: event.message || "Pose worker failed." });
-    };
-    this.worker.postMessage({ type: "init" });
+    // The video can already be visible while the heavier on-device pose model
+    // is still loading. Keep these two states distinct in the UI.
+    this.onStatus?.({ state: "loading", message: "Камера включена · загружаем распознавание…" });
+
+    try {
+      this.worker = new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" });
+      this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
+      this.worker.onerror = (event) => {
+        this.onStatus?.({ state: "error", message: event.message || "Pose worker failed." });
+      };
+      this.worker.postMessage({ type: "init" });
+    } catch (error) {
+      this.stop();
+      throw error;
+    }
 
     this.running = true;
     this.scheduleFrame();
   }
 
   stop() {
+    this.generation += 1;
     this.running = false;
     this.worker?.terminate();
     this.worker = null;
@@ -125,10 +149,14 @@ export class PoseTracker {
           this.frameBusy = true;
           try {
             const bitmap = await createImageBitmap(this.video);
+            if (!this.running || !this.worker) {
+              bitmap.close?.();
+              return;
+            }
             this.worker.postMessage({ type: "frame", bitmap, timestampMs: now }, [bitmap]);
           } catch (error) {
             this.frameBusy = false;
-            this.onStatus?.({ state: "error", message: String(error?.message || error) });
+            if (this.running) this.onStatus?.({ state: "error", message: String(error?.message || error) });
           }
         }
       }

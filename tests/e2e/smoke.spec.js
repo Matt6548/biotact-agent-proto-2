@@ -1,87 +1,50 @@
 import { test, expect } from "@playwright/test";
 
-async function completeBriefing(page,name="Test Player"){
-  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toBeVisible();
-  await page.locator("#player-name-input").fill(name);
-  await page.locator("#safety-ack").check();
-  await expect(page.getByRole("button",{name:"Enter training"})).toBeEnabled();
-  await page.getByRole("button",{name:"Enter training"}).click();
-  await expect(page.locator("#mission-gate")).toBeHidden();
-}
-
-
-test("mandatory briefing explains the game before training",async({page},testInfo)=>{
+test("one-screen candle practice opens without any mandatory briefing",async({page},testInfo)=>{
   await page.goto("/");
-  await expect(page.getByText("Required once before your first session.")).toBeVisible();
-  await expect(page.getByText(/does not measure real punch force/i)).toBeVisible();
-  await expect(page.getByText(/No real candle is needed/i)).toBeVisible();
-  await expect(page.getByRole("button",{name:"Enter training"})).toBeDisabled();
-  await page.locator("#player-name-input").fill("QA Fighter");
-  await expect(page.getByRole("button",{name:"Enter training"})).toBeDisabled();
-  await page.locator("#safety-ack").check();
-  await page.screenshot({path:testInfo.outputPath("00-mission-briefing.png"),fullPage:true});
-  await page.getByRole("button",{name:"Enter training"}).click();
+  await expect(page.getByRole("heading",{name:"Игра со свечой"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeEnabled();
+  await expect(page.getByRole("dialog",{name:"Candle Strike"})).toHaveCount(0);
   await expect(page.locator("#mission-gate")).toBeHidden();
-  await expect(page.locator("#player-display")).toHaveText("QA Fighter");
-
-  await page.reload();
-  await expect(page.locator("#mission-gate")).toBeHidden();
-  await expect(page.locator("#player-display")).toHaveText("QA Fighter");
-  await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
+  await expect(page.locator("#target-canvas canvas")).toBeVisible();
+  await expect(page.getByText("Не используй настоящую свечу.",{exact:false})).toBeVisible();
+  await expect(page.locator(".mission-strip")).toBeHidden();
+  await expect(page.locator(".player-layer")).toBeHidden();
+  await expect(page.locator(".level-line")).toBeHidden();
+  const visualOrder=await page.evaluate(()=>Array.from(document.querySelector(".live-grid").children,el=>el.className));
+  expect(visualOrder).toEqual(["target-card","camera-card"]);
+  await page.screenshot({path:testInfo.outputPath("01-candle-open.png"),fullPage:true});
 });
 
-test("focused arena completes one fixed-goal five-strike round",async({page},testInfo)=>{
+test("simulation supports unlimited strikes with no stages or score gate",async({page},testInfo)=>{
+  // 25 real UI clicks plus a full-page WebGL screenshot can exceed Playwright's
+  // 30-second default when the fake-camera project uses the GPU in parallel.
+  test.setTimeout(75_000);
   await page.goto("/");
-  await completeBriefing(page);
-  await expect(page.getByRole("heading",{name:"Candle Strike"})).toBeVisible();
-  await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
-  await expect(page.locator(".player-layer")).not.toHaveAttribute("open","");
-  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
-
-  const target=page.locator("#target-canvas canvas");
-  await expect(target).toBeVisible();
-  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-document.documentElement.clientWidth);
-  expect(overflow).toBeLessThanOrEqual(1);
-
-  await page.screenshot({path:testInfo.outputPath("01-initial.png"),fullPage:true});
-
+  await page.getByText("История и технические настройки").click();
   await page.getByText("Engineering simulation controls").click();
-  await page.getByRole("button",{name:"Start simulated round"}).click();
-  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
-
-  for(let i=0;i<5;i+=1){
-    await page.getByRole("button",{name:"Simulate strike"}).click();
-    if(i<4)await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
-    await page.waitForTimeout(80);
-  }
-
-  await expect(page.locator("#round-summary")).toBeVisible();
-  await expect(page.locator("#round-count")).toHaveText("5 / 5");
-  await expect(page.locator("#summary-score")).not.toHaveText("—");
-  await expect(page.locator("#arena-goal")).toHaveText("Deflect the flame");
-  await expect(page.locator("#round-success")).toHaveText("3 / 3");
-  await expect(page.locator("#level")).toHaveText("Next · 2 · Destabilize");
-  await expect(page.locator("#round-insight")).toBeVisible();
-  await expect(page.locator("#summary-consistency")).toContainText(/Stable|Developing|Variable/);
-  await expect(page.locator("#summary-drill")).toContainText(/drill/i);
-  await expect(page.locator("#session-review")).toBeVisible();
-  await expect(page.locator("#session-rounds")).toHaveText("1");
-  await expect(page.locator("#session-score")).not.toHaveText("—");
-  await expect(page.locator("#session-focus")).not.toHaveText("");
-  await expect(page.locator("#field-pack-export")).toBeDisabled();
-
-  await page.screenshot({path:testInfo.outputPath("02-round-complete.png"),fullPage:true});
+  await page.getByRole("button",{name:"Демо без камеры"}).click();
+  const simulate=page.getByRole("button",{name:"Simulate strike"});
+  for(let i=0;i<25;i+=1)await simulate.click();
+  await expect(page.locator("#round-count")).toHaveText("25");
+  await expect(page.locator("#round-summary")).toBeHidden();
+  await expect(page.locator("#practice-status")).toHaveText("Готово к началу");
+  await expect(page.locator("#flame-state")).not.toHaveText("Stable flame");
+  await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeEnabled();
+  await page.getByRole("button",{name:"Зажечь снова"}).click();
+  await expect(page.locator("#flame-state")).toHaveText("Пламя спокойно");
+  await page.screenshot({path:testInfo.outputPath("02-free-practice-demo.png"),fullPage:true});
 });
 
-test("mobile focused arena has one primary action and no horizontal overflow",async({page},testInfo)=>{
+test("mobile keeps the big candle visible without horizontal overflow",async({page},testInfo)=>{
   test.skip(testInfo.project.name!=="mobile-chromium","mobile-specific check");
   await page.goto("/");
-  await completeBriefing(page);
-  await expect(page.getByRole("button",{name:"Start training"})).toBeVisible();
-  await expect(page.locator(".tracking-details")).not.toHaveAttribute("open","");
-  const arenaPosition=await page.locator(".arena-status").evaluate((el)=>getComputedStyle(el).position);
-  expect(arenaPosition).not.toBe("sticky");
+  await expect(page.locator("#target-canvas canvas")).toBeVisible();
+  await expect(page.locator(".target-card")).toBeVisible();
+  await expect(page.getByRole("button",{name:"Начать упражнение"})).toBeVisible();
   const widths=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth}));
   expect(widths.scroll).toBeLessThanOrEqual(widths.client+1);
-  await page.screenshot({path:testInfo.outputPath("03-mobile-focused.png"),fullPage:true});
+  const targetHeight=await page.locator(".scene").evaluate(el=>el.getBoundingClientRect().height);
+  expect(targetHeight).toBeGreaterThan(300);
+  await page.screenshot({path:testInfo.outputPath("03-mobile-free-practice.png"),fullPage:true});
 });

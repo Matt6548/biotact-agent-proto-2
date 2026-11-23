@@ -98,10 +98,45 @@ export class MotionTraceRecorder{
   }
 }
 
+// Stage 30: Replay untrusted imported traces only after validating each compact frame.
+// Numeric landmarks are sensitive data; never allow arbitrary metadata to travel in frames.
+function exactKeys(object,keys){
+  return object!==null&&typeof object==="object"&&!Array.isArray(object)&&
+    Object.keys(object).length===keys.length&&keys.every((key)=>Object.hasOwn(object,key));
+}
+
+function validPoint(point){
+  if(point===null)return true; // Lost/occluded landmarks are expected in real recordings.
+  if(!point||typeof point!=="object"||Array.isArray(point))return false;
+  const keys=Object.keys(point);
+  if(keys.some((key)=>!["x","y","z","v"].includes(key)))return false;
+  if(!["x","y","z"].every((key)=>typeof point[key]==="number"&&Number.isFinite(point[key])&&Math.abs(point[key])<=1000))return false;
+  return !Object.hasOwn(point,"v")||
+    (typeof point.v==="number"&&Number.isFinite(point.v)&&point.v>=0&&point.v<=1);
+}
+
+function validPointMap(map,indices){
+  const keys=indices.map(String);
+  return exactKeys(map,keys)&&keys.every((key)=>validPoint(map[key]));
+}
+
 export function validateMotionTrace(trace){
   if(!trace||trace.schema!=="martial-training-motion-trace/v1")return{ok:false,reason:"unsupported-schema"};
   if(!Array.isArray(trace.frames)||trace.frames.length===0)return{ok:false,reason:"empty-trace"};
   if(trace.frames.length>5000)return{ok:false,reason:"trace-too-large"};
+  if(Object.hasOwn(trace,"frameCount")&&trace.frameCount!==trace.frames.length)return{ok:false,reason:"invalid-frame-count"};
+  let previousT=-Infinity;
+  for(const frame of trace.frames){
+    if(!exactKeys(frame,["t","fps","l","w"])||
+       !Number.isSafeInteger(frame.t)||frame.t<0||
+       !Number.isInteger(frame.fps)||frame.fps<0||frame.fps>1000||
+       !validPointMap(frame.l,LANDMARK_INDICES)||
+       !validPointMap(frame.w,WORLD_INDICES)){
+      return{ok:false,reason:"invalid-frame"};
+    }
+    if(frame.t<previousT)return{ok:false,reason:"nonmonotonic-timestamps"};
+    previousT=frame.t;
+  }
   return{ok:true,frameCount:trace.frames.length};
 }
 

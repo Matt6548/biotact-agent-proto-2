@@ -13,13 +13,15 @@ import { normalizeStrikeIntensity } from "./core/intensity.js";
 import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./core/motion-trace.js";
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
+import { FreePracticeCameraController } from "./features/free-practice.js";
 import { createCandleTarget } from "./render/candle-target.js";
-import { PoseTracker } from "./vision/pose-tracker.js";
 
 const session=new CandleTrainingSession();
 const analyzer=new LiveTrainingAnalyzer();
 const progression=new TrainingProgression();
-const round=new TrainingRound({attemptLimit:5});
+// The round aggregator remains as a lightweight event counter for legacy
+// diagnostics. Its limit is intentionally unreachable: practice never ends.
+const round=new TrainingRound({attemptLimit:Number.POSITIVE_INFINITY});
 const trainingSessionReview=new TrainingSessionReview();
 const traceRecorder=new MotionTraceRecorder({maxFrames:900});
 const poseReadiness=new StableReadiness({requiredConsecutive:6});
@@ -30,7 +32,7 @@ const HISTORY_KEY="martial-training-lab.attempts.v1";
 const PLAYER_PROFILE_KEY="martial-training-lab.player.v1";
 
 root.innerHTML=`
-<section class="mission-gate" id="mission-gate" role="dialog" aria-modal="true" aria-labelledby="briefing-title">
+<section class="mission-gate" id="mission-gate" role="dialog" aria-modal="true" aria-labelledby="briefing-title" hidden>
   <div class="briefing-shell">
     <h1 id="briefing-title">Candle Strike</h1>
     <p class="briefing-meta">Required once before your first session.</p>
@@ -65,10 +67,11 @@ root.innerHTML=`
   </div>
 </section>
 
-<main class="lab" inert>
+<main class="lab">
   <header class="hero">
-    <div><h1>Candle Strike</h1><p class="stage-label">Training Arena · local motion + reactive 3D target</p></div>
-    <p class="lede">Five controlled strikes. Build a repeatable line, move the virtual flame, then earn the next distance.</p>
+    <div><p class="stage-label">Свободная тренировка · виртуальная свеча</p><h1>Игра со свечой</h1></div>
+    <p class="lede">Двигайся перед камерой и наблюдай за пламенем. Без уровней, таймера и ограничения ударов.</p>
+    <p class="safety-inline">Освободи место · без настоящего огня · камера обрабатывается локально</p>
   </header>
 
   <section class="mission-strip" aria-label="Current story mission">
@@ -87,35 +90,36 @@ root.innerHTML=`
   </details>
 
   <section class="arena-status" aria-label="Training status">
-    <div><span>Goal</span><strong id="arena-goal">Deflect the flame</strong></div>
-    <div><span>Round</span><strong id="round-count">0 / 5</strong></div>
-    <div><span>Target hits</span><strong id="round-success">0 / 3</strong></div>
-    <button id="primary-action" type="button">Start training</button>
+    <div class="practice-message"><span>Упражнение</span><strong id="practice-status" aria-live="polite">Готово к началу</strong></div>
+    <div class="legacy-counter" hidden><span>Goal</span><strong id="arena-goal">Deflect the flame</strong></div>
+    <div class="legacy-counter" hidden><span>Round</span><strong id="round-count">0</strong></div>
+    <div class="legacy-counter" hidden><span>Target hits</span><strong id="round-success">0</strong></div>
+    <button id="primary-action" type="button">Начать упражнение</button>
   </section>
 
   <section class="live-grid">
+    <article class="target-card">
+      <div class="target-head"><h2>Свеча</h2><div class="target-actions"><button class="text-button" id="inspect-camera" type="button">Настроить камеру</button><button class="text-button" id="reset" type="button">Зажечь снова</button></div></div>
+      <div class="scene" aria-label="Virtual candle"><div id="target-canvas" class="target-canvas"></div><div id="hit-feedback" class="hit-feedback" aria-live="polite"></div><div class="target-overlay"><span id="flame-state" aria-live="polite">Пламя спокойно</span><small>Повернуть · приблизить</small></div></div>
+      <details class="practice-stats"><summary>Подробнее о движении</summary>
+      <div class="strike-result" aria-live="polite"><div><span>Условный отклик</span><strong id="score">—</strong></div><div><span>Последнее движение</span><strong id="last-strike">Ожидание</strong></div></div>
+      <div class="coach-panel" aria-live="polite">
+        <div class="level-line" hidden><span>Training level</span><strong id="level">1 · Deflect</strong><span id="level-progress">0/3</span></div>
+        <p id="coach-outcome">Начни упражнение, когда будешь готов.</p><ul id="coach-cues"></ul>
+      </div>
+      </details>
+    </article>
     <article class="camera-card" id="camera-card" data-camera="off">
-      <div class="camera-head"><h2>Training view</h2><span class="status-pill" id="camera-status" data-state="idle">Camera off</span></div>
+      <div class="camera-head"><h2>Настройка движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span><button class="text-button back-to-candle" id="back-to-candle" type="button">К свече ↑</button></div>
       <div class="camera-stage" id="camera-stage">
         <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
-        <div class="frame-guide" aria-hidden="true"><span>Keep shoulders and hips inside this area</span></div>
+        <div class="frame-guide" aria-hidden="true"><span>Держи плечи и корпус в кадре</span></div>
         <div id="mini-target-canvas" class="mini-target" aria-hidden="true"></div>
-        <div id="hit-feedback" class="hit-feedback" aria-live="polite"></div>
-        <div class="camera-empty" id="camera-empty"><strong>Start training when you are ready</strong><span>Then stand 1.5–2.5 m away with shoulders, elbows, wrists and hips visible.</span></div>
+        <div class="camera-empty" id="camera-empty"><strong>Камера пока выключена</strong><span>Включится только после нажатия «Начать упражнение».</span></div>
       </div>
-      <div class="setup-line"><div><span>Setup</span><strong id="setup-state">Camera not started</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Stop camera</button></div>
-      <details class="tracking-details"><summary>Tracking details</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div><div class="device-readiness-line"><span>Device readiness</span><strong id="device-readiness">Collecting…</strong><small>Engineering estimate from runtime FPS and inference latency; not a training or medical score.</small></div></details>
-      <p class="camera-note">Use comfortable straight punches for calibration, not maximum effort. Keep real open flames away from the training area.</p>
-    </article>
-
-    <article class="target-card">
-      <div class="target-head"><h2>Reactive target</h2><button class="text-button" id="reset" type="button">Reset target</button></div>
-      <div class="scene" aria-label="Virtual candle"><div id="target-canvas" class="target-canvas"></div><div class="target-overlay"><span id="flame-state" aria-live="polite">Stable flame</span><small>Drag to inspect · wheel/pinch to zoom</small></div></div>
-      <div class="strike-result" aria-live="polite"><div><span>Score</span><strong id="score">—</strong></div><div><span>Last strike</span><strong id="last-strike">Waiting</strong></div></div>
-      <div class="coach-panel" aria-live="polite">
-        <div class="level-line"><span>Training level</span><strong id="level">1 · Deflect</strong><span id="level-progress">0/3</span></div>
-        <p id="coach-outcome">Start training to begin.</p><ul id="coach-cues"></ul>
-      </div>
+      <div class="setup-line"><div><span>Положение</span><strong id="setup-state">Камера не запущена</strong></div><button id="stop-camera" class="text-button" type="button" disabled>Завершить</button></div>
+      <details class="tracking-details"><summary>Технические данные</summary><div class="metric-strip"><div><span>Quality</span><strong id="quality">—</strong></div><div><span>FPS</span><strong id="fps">—</strong></div><div><span>Model</span><strong id="model-backend">—</strong></div><div><span>Inference</span><strong id="inference-ms">—</strong></div><div><span>Busy skips/s</span><strong id="busy-skips">—</strong></div><div><span>Left wrist est.</span><strong id="left-speed">—</strong></div><div><span>Right wrist est.</span><strong id="right-speed">—</strong></div></div><div class="device-readiness-line"><span>Device readiness</span><strong id="device-readiness">Collecting…</strong><small>Engineering estimate from runtime FPS and inference latency; not a training or medical score.</small></div></details>
+      <p class="camera-note">Освободи место вокруг себя. Не используй настоящую свечу. Оценка движения не измеряет силу удара.</p>
     </article>
   </section>
 
@@ -146,7 +150,8 @@ root.innerHTML=`
     <div class="session-focus"><span>Session focus</span><strong id="session-focus">Repeatability</strong><small id="session-focus-cue">Build a repeatable pattern before increasing difficulty.</small></div>
   </section>
 
-  <details class="history-card"><summary>Recent attempts <span id="history-count">0</span></summary><div class="history-head"><span>Stored only in this browser</span><button class="text-button" id="clear-history" type="button">Clear</button></div><ol id="history" class="history-list"></ol></details>
+  <details class="advanced-panel"><summary>История и технические настройки</summary>
+  <details class="history-card"><summary>Последние движения <span id="history-count">0</span></summary><div class="history-head"><span>Данные остаются в браузере</span><button class="text-button" id="clear-history" type="button">Очистить</button></div><ol id="history" class="history-list"></ol></details>
 
   <details class="field-test">
     <summary>Field test data</summary>
@@ -170,13 +175,14 @@ root.innerHTML=`
   </details>
 
   <details class="simulation"><summary>Engineering simulation controls</summary>
-    <div class="demo-actions"><button id="demo-round" class="secondary-button" type="button">Start simulated round</button><span>Developer path for QA without a webcam.</span></div>
+    <div class="demo-actions"><button id="demo-round" class="secondary-button" type="button">Демо без камеры</button><span>Тестовый режим, не реальная тренировка.</span></div>
     <form id="controls" class="controls">
       <label>Strike speed <output id="speed-out">7.0</output><input id="speed" type="range" min="1" max="12" step="0.1" value="7" /></label>
       <label>Alignment <output id="alignment-out">90%</output><input id="alignment" type="range" min="0" max="1" step="0.01" value="0.9" /></label>
       <label>Virtual distance <output id="distance-out">30 cm</output><input id="distance" type="range" min="0.1" max="1" step="0.01" value="0.3" /></label>
       <button type="submit">Simulate strike</button>
     </form>
+  </details>
   </details>
 </main>`;
 
@@ -200,6 +206,12 @@ let miniCandleRenderer=null;
 const miniTargetContainer=root.querySelector("#mini-target-canvas");
 const video=root.querySelector("#camera"),overlay=root.querySelector("#pose-overlay"),ctx=overlay.getContext("2d");
 const cameraCard=root.querySelector("#camera-card"),cameraEmpty=root.querySelector("#camera-empty");
+root.querySelector("#inspect-camera").addEventListener("click",()=>{
+  cameraCard.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+});
+root.querySelector("#back-to-candle").addEventListener("click",()=>{
+  root.querySelector(".scene").scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+});
 const stopCamera=root.querySelector("#stop-camera"),cameraStatus=root.querySelector("#camera-status"),setupState=root.querySelector("#setup-state"),primaryAction=root.querySelector("#primary-action");
 const qualityEl=root.querySelector("#quality"),fpsEl=root.querySelector("#fps"),modelBackendEl=root.querySelector("#model-backend"),inferenceEl=root.querySelector("#inference-ms"),busySkipsEl=root.querySelector("#busy-skips"),deviceReadinessEl=root.querySelector("#device-readiness"),leftSpeedEl=root.querySelector("#left-speed"),rightSpeedEl=root.querySelector("#right-speed");
 const speed=root.querySelector("#speed"),alignment=root.querySelector("#alignment"),distance=root.querySelector("#distance"),flameState=root.querySelector("#flame-state"),score=root.querySelector("#score"),lastStrike=root.querySelector("#last-strike"),historyEl=root.querySelector("#history"),historyCount=root.querySelector("#history-count");
@@ -208,24 +220,33 @@ const arenaGoal=root.querySelector("#arena-goal"),roundCount=root.querySelector(
 const traceToggle=root.querySelector("#trace-toggle"),traceExport=root.querySelector("#trace-export"),traceImport=root.querySelector("#trace-import"),traceReplay=root.querySelector("#trace-replay"),traceClear=root.querySelector("#trace-clear"),deviceReportExport=root.querySelector("#device-report-export"),fieldPackExport=root.querySelector("#field-pack-export"),traceStatus=root.querySelector("#trace-status");
 let importedTrace=null,replayingTrace=false,lastFieldRoundEvidence=null;
 let localPlayer=readLocalPlayer();
-let tracker=null,relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null;
+let relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,cameraBusy=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null,trainingPaused=false;
+const practiceStatus=root.querySelector("#practice-status");
+const freePractice=new FreePracticeCameraController({
+  video,
+  onUpdate:updateFreePracticeLive,
+  onStatus:setCameraStatus,
+});
+let practiceTickTimer=null;
+
+function stopPracticeTick(){
+  clearInterval(practiceTickTimer);
+  practiceTickTimer=null;
+}
+function startPracticeTick(){
+  stopPracticeTick();
+  let last=performance.now();
+  practiceTickTimer=setInterval(()=>{
+    if(!cameraStarted||trainingPaused||document.hidden)return;
+    const now=performance.now();
+    candleRenderer.setState(freePractice.tick((now-last)/1000));
+    last=now;
+  },50);
+}
 
 function syncRendererMode(){
-  const useMini=mobileTrainingQuery.matches&&cameraStarted&&!document.hidden;
-  if(useMini){
-    if(!miniCandleRenderer){
-      miniCandleRenderer=createCandleTarget(miniTargetContainer,{
-        pixelRatio:1,
-        interactive:false,
-      });
-      miniCandleRenderer.setState(session.flame.snapshot());
-    }
-    candleRenderer.setActive(false);
-    miniCandleRenderer.setActive(true);
-    cameraCard.dataset.rendererMode="mini";
-    return;
-  }
-
+  // The candle remains the hero on mobile, even while the camera is on.
+  // A second WebGL context would waste battery and hide the full-size target.
   if(miniCandleRenderer){
     miniCandleRenderer.dispose();
     miniCandleRenderer=null;
@@ -270,11 +291,9 @@ playerNameInput.addEventListener("input",updateBriefingControls);
 safetyAck.addEventListener("change",updateBriefingControls);
 updateBriefingControls();
 
-if(hasCompletedBriefing(localPlayer)){
-  hideBriefing();
-}else{
-  showBriefing();
-}
+// The archived briefing is not a gate. Safety information stays visible near
+// the camera and the privacy details stay available in the advanced panel.
+hideBriefing();
 
 enterTraining.addEventListener("click",()=>{
   const now=Date.now();
@@ -326,16 +345,9 @@ function updateLevel(){
   }
 }
 function updatePrimary(){
-  if(calibrating){primaryAction.textContent="Calibrating…";primaryAction.disabled=true;return;}
-  if(round.active){primaryAction.textContent=`Round active · ${round.snapshot().attempts}/${round.attemptLimit}`;primaryAction.disabled=true;return;}
-  primaryAction.disabled=false;
-  if(!cameraStarted)primaryAction.textContent="Start training";
-  else if(!poseReady){primaryAction.textContent="Loading motion model…";primaryAction.disabled=true;}
-  else if(!calibrated&&!poseReadiness.ready){primaryAction.textContent="Step into frame";primaryAction.disabled=true;}
-  else if(!calibrated)primaryAction.textContent="Calibrate 5 s";
-  else if(round.complete&&lastRoundOutcome?.levelUp)primaryAction.textContent=`Start next level · ${lastRoundOutcome.level.name}`;
-  else if(round.complete)primaryAction.textContent="Repeat 5-strike round";
-  else primaryAction.textContent="Start 5-strike round";
+  primaryAction.disabled=cameraBusy;
+  primaryAction.textContent=cameraBusy?"Включаем камеру…":!cameraStarted?"Начать упражнение":trainingPaused?"Продолжить":"Пауза";
+  practiceStatus.textContent=!cameraStarted?"Готово к началу":trainingPaused?"Пауза · камера выключена":!poseReady?"Подключаем отслеживание движения":freePractice.snapshot().state==="framing"?"Поправь положение":"Свободная тренировка";
 }
 function syncFieldPackButton(){
   const trace=traceRecorder.export();
@@ -354,8 +366,8 @@ function renderSessionReview(summary=trainingSessionReview.snapshot()){
 }
 
 function updateRound(snapshot=round.snapshot()){
-  roundCount.textContent=`${snapshot.attempts} / ${snapshot.attemptLimit}`;
-  roundSuccess.textContent=`${Math.min(snapshot.successes,progression.requiredSuccesses)} / ${progression.requiredSuccesses}`;
+  roundCount.textContent=String(snapshot.attempts);
+  roundSuccess.textContent=String(snapshot.successes);
   if(snapshot.complete){
     roundSummary.hidden=false;
     root.querySelector("#summary-score").textContent=String(snapshot.averageScore);
@@ -403,7 +415,7 @@ function resetCandleOnly(){
   session.reset();
   candleRenderer.reset();
   miniCandleRenderer?.reset();
-  flameState.textContent="Stable flame";
+  flameState.textContent="Пламя спокойно";
 }
 function scheduleRelight(){clearTimeout(relightTimer);relightTimer=setTimeout(resetCandleOnly,2200);}
 function renderFlame(result,strikeLabel){
@@ -412,7 +424,7 @@ function renderFlame(result,strikeLabel){
   miniCandleRenderer?.triggerImpulse(impulse);
   candleRenderer.setState(result.flame);
   miniCandleRenderer?.setState(result.flame);
-  flameState.textContent=result.flame.extinguished?"Flame extinguished":result.flame.instability>.65?"Flame highly unstable":result.flame.tilt>.3?"Flame deflected":"Flame disturbed";
+  flameState.textContent=result.flame.extinguished?"Пламя погасло":result.flame.instability>.65?"Пламя колеблется":result.flame.tilt>.3?"Пламя отклонилось":"Пламя движется";
   score.textContent=String(result.score.score);lastStrike.textContent=strikeLabel||result.score.grade;flashResult(result);
 }
 function hapticFor(result){
@@ -421,7 +433,8 @@ function hapticFor(result){
 }
 
 function drawPose(landmarks){
-  if(!landmarks||!video.videoWidth||!video.videoHeight)return;
+  if(!landmarks){ctx.clearRect(0,0,overlay.width,overlay.height);return;}
+  if(!video.videoWidth||!video.videoHeight)return;
   if(overlay.width!==video.videoWidth||overlay.height!==video.videoHeight){overlay.width=video.videoWidth;overlay.height=video.videoHeight;}
   ctx.clearRect(0,0,overlay.width,overlay.height);ctx.lineWidth=Math.max(2,overlay.width/420);ctx.lineCap="round";ctx.strokeStyle="rgba(241,235,215,.84)";ctx.fillStyle="rgba(255,255,255,.96)";
   for(const[a,b]of CONNECTIONS){const pa=landmarks[a],pb=landmarks[b];if(!pa||!pb||(pa.visibility??0)<.5||(pb.visibility??0)<.5)continue;ctx.beginPath();ctx.moveTo(pa.x*overlay.width,pa.y*overlay.height);ctx.lineTo(pb.x*overlay.width,pb.y*overlay.height);ctx.stroke();}
@@ -435,18 +448,24 @@ function setCameraStatus({state,message,delegate}){
     modelBackendEl.textContent=delegate||"—";
     if(cameraStarted&&!calibrating){
       cameraCard.dataset.pose="missing";
-      setupState.textContent="Motion model ready · step into frame";
+      setupState.textContent="Отслеживание готово · держи руки в кадре";
     }
     updatePrimary();
   }else if(state==="privacy-block"){
     setupState.textContent="External SDK request blocked · training data remains local";
+    poseReady=false;
+    if(cameraStarted&&!trainingPaused){showPausedCamera();cameraStatus.dataset.state="error";cameraStatus.textContent=message||"Камера остановлена для безопасности";}
   }else if(state==="error"){
     poseReady=false;
-    if(cameraStarted)setupState.textContent="Motion model failed · stop camera and retry";
+    if(cameraStarted&&!trainingPaused){showPausedCamera();cameraStatus.dataset.state="error";cameraStatus.textContent=message||"Ошибка камеры";}
     updatePrimary();
   }else if(state==="starting"){
     poseReady=false;
-    setupState.textContent="Starting camera…";
+    setupState.textContent="Запрашиваем доступ к камере…";
+    updatePrimary();
+  }else if(state==="loading"){
+    poseReady=false;
+    setupState.textContent="Камера включена · загружаем распознавание…";
     updatePrimary();
   }
 }
@@ -506,7 +525,7 @@ function processStrike(strike,{recordHistory=true,haptic=true}={}){
     if(!round.complete)coachOutcome.textContent="Strike detected. Finish setup, then start a five-strike round.";
   }
 
-  if(result.flame.extinguished)scheduleRelight();
+  // The user can relight the virtual candle; a completed strike never ends practice.
   return result;
 }
 
@@ -521,6 +540,61 @@ function finishCalibration(){
     :profile.reason==="movement-too-slow"
       ?"Calibration failed · make 3–5 clear comfortable punches"
       :"Calibration failed · keep your full upper body visible";
+  updatePrimary();
+}
+
+// The live UI uses the continuous CV engine. Old round/calibration functions
+// remain isolated for the opt-in engineering demo and trace replay.
+function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCount}){
+  if(!frame)return;
+  if(frame.diagnostics){
+    if(frame.diagnostics.delegate)modelBackendEl.textContent=frame.diagnostics.delegate;
+    inferenceEl.textContent=Number.isFinite(frame.diagnostics.inferenceMs)?`${Math.round(frame.diagnostics.inferenceMs)} ms`:"—";
+    busySkipsEl.textContent=Number.isFinite(frame.diagnostics.busySkipsPerSecond)?String(frame.diagnostics.busySkipsPerSecond):"—";
+    const report=deviceDiagnostics.add({fps:frame.fps,timestampMs:frame.timestampMs,...frame.diagnostics});
+    deviceReadinessEl.textContent=({insufficient:"Собираем данные…",ready:"Готово",constrained:"Нагрузка повышена",limited:"Устройство ограничено"})[report.status]||"Собираем данные…";
+    deviceReadinessEl.dataset.state=report.status;
+    deviceReportExport.disabled=report.status==="insufficient";
+    syncFieldPackButton();
+  }
+  if(traceRecorder.active){
+    traceRecorder.add(frame);
+    traceStatus.textContent=`Recording · ${traceRecorder.frames.length} frames`;
+    if(!traceRecorder.active){
+      traceToggle.textContent="Start motion trace";
+      traceExport.disabled=traceRecorder.frames.length===0;
+      traceStatus.textContent=`Trace capped · ${traceRecorder.frames.length} frames`;
+    }
+  }
+  drawPose(frame.landmarks);
+  if(!analysis?.metrics){
+    cameraCard.dataset.pose="missing";
+    qualityEl.textContent="Человек не найден";
+    setupState.textContent="Встань перед камерой, чтобы были видны плечи и руки";
+    updatePrimary();
+    return;
+  }
+  cameraCard.dataset.pose=state==="practicing"?"ready":"adjust";
+  fpsEl.textContent=String(Math.round(analysis.metrics.fps||0));
+  leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} условн. ед./с`;
+  rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} условн. ед./с`;
+  qualityEl.textContent=analysis.quality.ok?"В кадре":"Поправь положение";
+  setupState.textContent=state==="practicing"
+    ?"Всё готово · двигайся свободно"
+    :"Держи плечи, руки и корпус в кадре";
+  if(strike&&response){
+    const hand=strike.hand==="left"?"Левая":"Правая";
+    candleRenderer.setState(response.flame);
+    candleRenderer.triggerImpulse(response.visualImpulse);
+    flameState.textContent=response.flame.extinguished?"Пламя погасло":response.flame.instability>.65?"Пламя колеблется":"Пламя движется";
+    score.textContent=response.visualImpulse.toFixed(2);
+    lastStrike.textContent=`${hand} рука · относительное движение`;
+    roundCount.textContent=String(strikeCount);
+    hitFeedback.textContent=response.flame.extinguished?"Пламя погасло":"Движение зафиксировано";
+    hitFeedback.classList.remove("show");void hitFeedback.offsetWidth;hitFeedback.classList.add("show");
+    clearTimeout(hitTimer);hitTimer=setTimeout(()=>hitFeedback.classList.remove("show"),1100);
+    if(navigator.vibrate)navigator.vibrate(response.flame.extinguished?[28,18,36]:18);
+  }
   updatePrimary();
 }
 
@@ -593,7 +667,7 @@ function updateLive(result){
   }
 
   updatePrimary();
-  if(analysis.strike)processStrike(analysis.strike);
+  if(analysis.strike&&cameraStarted&&!trainingPaused)processStrike(analysis.strike);
 }
 
 async function startCameraFlow(){
@@ -605,35 +679,73 @@ async function startCameraFlow(){
   deviceReadinessEl.textContent="Collecting…";
   deviceReadinessEl.dataset.state="insufficient";
   deviceReportExport.disabled=true;
-  primaryAction.disabled=true;primaryAction.textContent="Starting camera…";
+  cameraBusy=true;updatePrimary();
   try{
-    analyzer.reset();poseReadiness.reset();calibrationClock.reset();poseReady=false;tracker=new PoseTracker({video,onResult:updateLive,onStatus:setCameraStatus});await tracker.start();
-    cameraStarted=true;calibrated=false;cameraCard.dataset.camera="on";cameraCard.dataset.pose="loading";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    if(round.active)round.reset();
+    freePractice.stop();
+    poseReady=false;
+    await freePractice.start();
+    cameraStarted=true;trainingPaused=false;calibrated=false;cameraCard.dataset.camera="on";cameraCard.dataset.pose="loading";lab.dataset.live="on";cameraEmpty.hidden=true;stopCamera.disabled=false;
+    resetCandleOnly();score.textContent="—";lastStrike.textContent="Ожидание";
+    coachOutcome.textContent="Двигайся в своём темпе. Нет уровней и ограничения ударов.";
+    coachCues.innerHTML="";
+    startPracticeTick();
     syncRendererMode();
-    setupState.textContent=poseReady?"Motion model ready · step into frame":"Camera ready · loading motion model…";
+    setupState.textContent=poseReady?"Камера готова · двигайся свободно":"Камера включена · загружаем распознавание…";
   }catch(error){
+    freePractice.stop();
+    stopPracticeTick();
     setCameraStatus({state:"error",message:error?.message||"Camera failed"});
-    setupState.textContent="Camera permission or device unavailable";
+    setupState.textContent="Нет доступа к камере. Проверь разрешение и попробуй снова.";
     cameraStarted=false;
     lab.dataset.live="off";
   }
-  updatePrimary();
-}
-function runCalibration(){
-  if(!tracker||!poseReady||!poseReadiness.ready||calibrating)return;
-  analyzer.startCalibration();
-  calibrationClock.start();
-  calibrating=true;
-  setupState.textContent="Move now · 5.0 s valid";
-  updatePrimary();
+  cameraBusy=false;updatePrimary();
 }
 function startRound({simulation=false}={}){
   round.start();roundLevel=progression.current();lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;updateRound();
-  coachOutcome.textContent=simulation?"Simulated round active. Use Simulate strike five times.":"Round active. Five controlled strikes.";
+  coachOutcome.textContent=simulation?"Демонстрация свободного упражнения":"Тренируйся в своём темпе. Ограничения по времени и ударам нет.";
   coachCues.innerHTML="";resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";
 }
 
-primaryAction.addEventListener("click",()=>{if(!cameraStarted){startCameraFlow();return;}if(!calibrated){runCalibration();return;}if(!round.active)startRound();});
+function showPausedCamera(){
+  stopPracticeTick();
+  trainingPaused=true;
+  cameraCard.dataset.camera="off";
+  cameraCard.dataset.pose="off";
+  cameraStatus.dataset.state="idle";
+  cameraStatus.textContent="Камера на паузе";
+  cameraEmpty.querySelector("strong").textContent="Камера на паузе";
+  cameraEmpty.querySelector("span").textContent="Нажми «Продолжить», чтобы снова включить камеру.";
+  cameraEmpty.hidden=false;
+  setupState.textContent="Движения не отслеживаются · камера выключена";
+  updatePrimary();
+}
+primaryAction.addEventListener("click",async()=>{
+  if(!cameraStarted){startCameraFlow();return;}
+  if(!trainingPaused){freePractice.pause();showPausedCamera();return;}
+  cameraBusy=true;updatePrimary();
+  try{
+    poseReady=false;
+    await freePractice.resume();
+    trainingPaused=false;
+    cameraCard.dataset.camera="on";
+    cameraCard.dataset.pose="loading";
+    cameraEmpty.hidden=true;
+    startPracticeTick();
+  }catch(error){
+    showPausedCamera();
+    cameraStatus.dataset.state="error";
+    cameraStatus.textContent=error?.message||"Не удалось включить камеру";
+  }
+  cameraBusy=false;updatePrimary();
+});
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden&&cameraStarted&&!trainingPaused){
+    freePractice.pause();
+    showPausedCamera();
+  }
+});
 stopCamera.addEventListener("click",()=>{
   if(traceRecorder.active){
     const trace=traceRecorder.stop();
@@ -646,11 +758,15 @@ stopCamera.addEventListener("click",()=>{
     calibrationClock.reset();
   }
   poseReadiness.reset();
-  tracker?.stop();tracker=null;analyzer.reset();cameraStarted=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
+  freePractice.stop();stopPracticeTick();analyzer.reset();cameraStarted=false;cameraBusy=false;trainingPaused=false;poseReady=false;calibrated=false;cameraCard.dataset.camera="off";cameraCard.dataset.pose="off";lab.dataset.live="off";
   syncRendererMode();
+  resetCandleOnly();
   ctx.clearRect(0,0,overlay.width,overlay.height);cameraEmpty.hidden=false;
-  stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";modelBackendEl.textContent="—";inferenceEl.textContent="—";busySkipsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Camera not started";
-  if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;coachOutcome.textContent="Round stopped with the camera. Start training when ready.";coachCues.innerHTML="";}
+  cameraEmpty.querySelector("strong").textContent="Камера пока выключена";
+  cameraEmpty.querySelector("span").textContent="Включится только после нажатия «Начать упражнение».";
+  cameraStatus.dataset.state="idle";cameraStatus.textContent="Камера выключена";
+  stopCamera.disabled=true;qualityEl.textContent="—";fpsEl.textContent="—";modelBackendEl.textContent="—";inferenceEl.textContent="—";busySkipsEl.textContent="—";leftSpeedEl.textContent="—";rightSpeedEl.textContent="—";setupState.textContent="Камера не запущена";
+  if(round.active){round.reset();roundLevel=null;lastRoundOutcome=null;roundSummary.hidden=true;roundInsight.hidden=true;coachOutcome.textContent="Упражнение завершено. Можно начать снова.";coachCues.innerHTML="";}
   updateRound();
 });
 
@@ -664,7 +780,7 @@ root.querySelector("#controls").addEventListener("submit",(event)=>{
   if(round.active)processStrike(strike,{recordHistory:false,haptic:false});
   else renderFlame(session.strike({speed:Number(speed.value),alignment:straightness,distance:Number(distance.value)}),"Simulation");
 });
-root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightTimer);resetCandleOnly();score.textContent="—";lastStrike.textContent="Waiting";coachOutcome.textContent=round.active?"Round active. Five controlled strikes.":"Start training to begin.";coachCues.innerHTML="";});
+root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightTimer);if(cameraStarted)freePractice.relight();resetCandleOnly();score.textContent="—";lastStrike.textContent="Ожидание";coachOutcome.textContent=cameraStarted||round.active?"Свободная тренировка продолжается.":"Начни упражнение, когда будешь готов.";coachCues.innerHTML="";});
 root.querySelector("#clear-history").addEventListener("click",()=>{attempts=[];writeHistory();renderHistory();});
 
 traceToggle.addEventListener("click",()=>{
@@ -756,6 +872,8 @@ traceImport.addEventListener("change",async()=>{
   traceReplay.disabled=true;
   if(!file)return;
   try{
+    // Reject untrusted oversized traces before reading or parsing JSON.
+    if(file.size>5*1024*1024)throw new Error("trace-file-too-large");
     const parsed=JSON.parse(await file.text());
     const validation=validateMotionTrace(parsed);
     if(!validation.ok)throw new Error(validation.reason);
