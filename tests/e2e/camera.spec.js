@@ -11,6 +11,10 @@ test("fake webcam initializes private pose runtime and the correct renderer mode
   });
 
   await page.goto("/");
+  // Browser CI may switch focus between Chromium workers. Test a visible tab,
+  // because the app correctly releases the camera on visibility loss.
+  await page.bringToFront();
+  await expect.poll(()=>page.evaluate(()=>document.visibilityState)).toBe("visible");
   await page.getByRole("button",{name:"Начать упражнение"}).click();
 
   await expect(page.locator("#camera-status")).toContainText(/Pose model ready/i,{timeout:20000});
