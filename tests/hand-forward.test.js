@@ -114,3 +114,41 @@ test('experimental controller shares exclusive camera lifecycle and rejects late
  controller.stop();
  assert.equal(trackers[1].stopped,true);
 });
+
+test('palm rotation changes only one size axis and fails closed',()=>{
+ const a=new HandForwardAnalyzer();
+ a.analyze(sample(0));
+ const twisted=sample(33);
+ twisted.hands[0][5].x-=.045;
+ twisted.hands[0][17].x+=.045;
+ const r=a.analyze(twisted);
+ assert.equal(r.strike,null);
+ assert.deepEqual(r.quality.reasons,['hand-shape-or-position-jump']);
+});
+test('experimental camera permission denial releases tracker and pauses without retry',async()=>{
+ let stopped=0,starts=0;
+ const controller=createHandForwardPractice({
+   video:{},visibilityTarget:null,
+   trackerFactory:()=>({async start(){starts++;throw new Error('permission-denied');},stop(){stopped++;}}),
+ });
+ await assert.rejects(controller.start(),/permission-denied/);
+ assert.equal(controller.engine.state,'paused');
+ assert.equal(starts,1);
+ assert.ok(stopped>=1);
+ controller.dispose();
+});
+test('privacy-block in hand-only mode releases the single camera and worker',async()=>{
+ let stopped=0,notify;
+ const controller=createHandForwardPractice({
+   video:{},visibilityTarget:null,
+   trackerFactory:({onStatus})=>{
+     notify=onStatus;
+     return {async start(){},stop(){stopped++;}};
+   },
+ });
+ await controller.start();
+ notify({state:'privacy-block'});
+ assert.equal(controller.engine.state,'paused');
+ assert.equal(stopped,1);
+ controller.dispose();
+});
