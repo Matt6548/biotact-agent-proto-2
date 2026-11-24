@@ -7,6 +7,17 @@ import {
 } from "./candle-shaders.js";
 
 const clamp = THREE.MathUtils.clamp;
+const CANDLE_FOCUS = [0, 0.74, 0];
+
+// Keep the full candle and tray in the default composition, including
+// a reserve for the shader's bending flame. Manual orbit/zoom is unchanged.
+export function createCandleCamera(aspect = 1) {
+  const camera = new THREE.PerspectiveCamera(46, aspect, 0.1, 100);
+  camera.position.set(0.36, 1.70, 5.80);
+  camera.lookAt(...CANDLE_FOCUS);
+  camera.updateMatrixWorld(true);
+  return camera;
+}
 
 export class CandleRenderer {
   constructor(container, { active = true, pixelRatio = 2, interactive = true } = {}) {
@@ -24,9 +35,7 @@ export class CandleRenderer {
     this.impactLife = 0;
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    // Front-of-observer composition with room for the wick and flame tip.
-    this.camera.position.set(0.36, 1.70, 5.80);
+    this.camera = createCandleCamera();
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -46,7 +55,7 @@ export class CandleRenderer {
     this.controls.maxDistance = 7.4;
     this.controls.minPolarAngle = 1.0;
     this.controls.maxPolarAngle = 1.48;
-    this.controls.target.set(0, 0.74, 0);
+    this.controls.target.set(...CANDLE_FOCUS);
 
     this.makeScene();
     this.resizeObserver = new ResizeObserver(() => this.resize());
