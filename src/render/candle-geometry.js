@@ -22,14 +22,37 @@ export function createWaxGeometry({ segments = 72 } = {}) {
       const angle = i / count * Math.PI * 2;
       const ripple = Math.sin(angle * 5 + 0.6) * 0.009 + Math.cos(angle * 11 - 0.8) * 0.0035;
       const waxFlow = Math.sin(angle * 7 + ring.height * 1.45) * 0.003;
-      const radius = ring.radius + ripple * (ring.well ? 0.35 : 1) + waxFlow;
+      // Three slowly cooled wax drips are sculpted into the SAME mesh, not extra draw calls.
+      const normalizedHeight = (ring.height + 1.075) / 2.15;
+      const drips = [
+        { a: 0.46, bottom: 0.64, spread: 0.17, depth: 0.028 },
+        { a: 2.55, bottom: 0.80, spread: 0.12, depth: 0.022 },
+        { a: 4.66, bottom: 0.49, spread: 0.19, depth: 0.034 },
+      ];
+      let dripThickness = 0;
+      if (!ring.well) {
+        for (const drip of drips) {
+          const delta = Math.atan2(Math.sin(angle - drip.a), Math.cos(angle - drip.a));
+          const along = Math.max(0, Math.min(1, (normalizedHeight - drip.bottom) / 0.20));
+          dripThickness += drip.depth * Math.exp(-0.5 * (delta / drip.spread) ** 2) * along;
+        }
+      }
+      const radius = ring.radius + ripple * (ring.well ? 0.35 : 1) + waxFlow + dripThickness;
       const rimWave = Math.sin(angle * 7 + 1.2) * 0.025 + Math.cos(angle * 13 - 0.2) * 0.010;
       const height = ring.height + (ring.rim ? rimWave : 0) + (ring.well ? rimWave * ring.well / 0.018 : 0);
 
       positions.push(Math.cos(angle) * radius, height, Math.sin(angle) * radius);
-      const streak = 0.968 + 0.021 * Math.sin(angle * 4 + height * 2.2) + 0.011 * Math.cos(angle * 15 + height * 4.1);
-      const shade = ring.well ? 1.015 : 1;
-      colors.push(wax.r * streak * shade, wax.g * streak * shade, wax.b * streak * shade);
+      // Low-cost ivory/amber marbling (per-vertex colour, no texture lookup).
+      const wave = 0.025 * Math.sin(angle * 4.2 + height * 1.7)
+        + 0.014 * Math.cos(angle * 12.4 - height * 3.2);
+      const candleTop = Math.max(0, Math.min(1, (height - 0.2) / 0.9));
+      const dripHighlight = Math.min(0.027, dripThickness * 0.7);
+      const nearPool = ring.well ? 0.05 : 0;
+      colors.push(
+        Math.min(1, wax.r * (0.955 + wave + candleTop * 0.035 + dripHighlight + nearPool)),
+        Math.min(1, wax.g * (0.930 + wave * 0.79 + candleTop * 0.031 + dripHighlight + nearPool * 0.67)),
+        Math.min(1, wax.b * (0.915 + wave * 0.70 + candleTop * 0.018 + nearPool * 0.22)),
+      );
       if (r > 0 && i > 0) {
         const a = (r - 1) * (count + 1) + i - 1;
         const b = r * (count + 1) + i - 1;
