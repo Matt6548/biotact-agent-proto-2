@@ -15,7 +15,7 @@
 
 ## Experimental MediaPipe Hand Landmarker Full FP16 v1 (opt-in only)
 - Source model: https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task
-- Runtime engine: already-declared `@mediapipe/tasks-vision@1.1.1`, no new package.
+- Hand-only SDK alias: `@mediapipe/hand-local` = `@mediapipe/tasks-vision@0.10.35` (Apache-2.0 declared by upstream npm package), pinned registry integrity. Separate matching local WASM directory; original Pose SDK 1.1.1 unchanged. Build checks known telemetry hostname and records SHA-256 of package bundle and WASM files. Field validation and complete artifact notices remain release gates.
 - License basis: Google MediaPipe repository Apache 2.0; re-check bundled model terms before release.
 - Expected bytes: 7,819,105; SHA-256: `fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1` (published independent provenance; the build verifies the downloaded bytes).
 - Model is downloaded only by explicit `node scripts/prepare-hand-landmarker-assets.mjs` at build time, never from Google by a client. The runtime worker loads same-origin WASM/model, rejects external fetch/XHR and sends numeric landmarks to the local main thread.
