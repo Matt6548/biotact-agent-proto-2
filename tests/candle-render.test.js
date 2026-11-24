@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { createWaxGeometry } from "../src/render/candle-geometry.js";
-import { CandleRenderer } from "../src/render/candle-renderer.js";
+import { CandleRenderer, createCandleCamera } from "../src/render/candle-renderer.js";
 import {
   flameVertexShader, flameFragmentShader, glowFragmentShader,
   smokeVertexShader, smokeFragmentShader,
@@ -175,4 +175,25 @@ test("renderer read-only diagnostics are scoped and disposal frees each resource
     geometry: 1, materialA: 1, materialB: 1,
     renderer: 1, context: 1, controls: 1, observer: 1, dom: 1,
   });
+});
+
+
+test("default camera keeps tray and bent flame within the four verified viewports", () => {
+  const points = [];
+  // Tray lower rim and conservative envelope for the core and displaced flame tip.
+  for (let i = 0; i < 64; i += 1) {
+    const a = i * Math.PI * 2 / 64;
+    points.push(new THREE.Vector3(.84 * Math.cos(a), -1.195, .84 * Math.sin(a)));
+  }
+  for (const x of [-.9, .9]) for (const y of [1.34, 2.68])
+    for (const z of [-.3, .3]) points.push(new THREE.Vector3(x, y, z));
+  for (const aspect of [336/589, 366/589, 1094/639, 1094/758]) {
+    const camera = createCandleCamera(aspect);
+    for (const point of points) {
+      const p = point.clone().project(camera);
+      assert.ok(Math.abs(p.x) < .94 && Math.abs(p.y) < .94,
+        "default camera should leave a screen margin at aspect " + aspect);
+      assert.ok(p.z > -1 && p.z < 1);
+    }
+  }
 });
