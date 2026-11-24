@@ -26,3 +26,12 @@ Fixture provenance: https://colab.research.google.com/github/googlesamples/media
 
 ## Remaining field gate
 Public photo pixels are genuine model input, but transformed photos/timestamps are not real punches. On Redmi Note 9S and desktop with explicit camera permission: 20 controlled forward/return gestures, 20 sideways/slow/static negatives, near/far, dark light, partial fist and two hands. Log only aggregate manual TP/FP/FN, delegate/init/inference p50/p90, processed FPS and motion-to-visible-response using independent timing; no upload of private media. Check loss/reacquisition, pause/resume/stop, mirror, fallback Pose after explicit user choice. No force or airflow measurement. BOSH may wire opt-in hand mode after gate; default UI stays Pose. No production deployment.
+
+## Measured follow-up on first implementation
+At exact first CV V2 candidate `8919b1169c565feed634037b00d692963a24be1a`, CI [45355596709](https://github.com/Matt6548/biotact-agent-proto-2/actions/runs/45355596709) and [numeric artifact](https://github.com/Matt6548/biotact-agent-proto-2/actions/runs/45355596709/artifacts/14902591089) both actual model cases PASS, 128/128 Node PASS. Pinned Google hand task SHA/length verified, public image SHA-256 `2aee0e3a69ba5f0d3287597e61d265f4f3ac2a44ccec198dddd2639b0c8ef7ba`.
+- Auto selected GPU: init 597.48ms, inference median 690.70ms, p90 1010.25ms.
+- Forced CPU: init 594.77ms, inference median 57.40ms, p90 82.11ms.
+- Each had 15/15 static frames with one real hand/21 finite landmarks, zero false events/previews on static frames, one confirmed event and four preview frames on the transformed photo, no hand in the final three blank frames, no external HTTP requests observed.
+- **FAIL for interactive GPU latency in that cloud runner**, despite successful GPU initialization. Cloud GPU may be software emulated; this is not a Redmi benchmark.
+
+Therefore the next candidate adds one-time CPU fallback if three consecutive GPU inference times exceed 120ms after two warmup frames. It closes the GPU graph before creating the CPU graph; transition frame is neutral and resets tracking, same stream/worker. Forced CPU is unchanged. The test now includes a wall-clock cadence phase with actual timestamps/observed processing FPS instead of relying solely on simulated 33ms; it still uses a public photograph and is not a human-camera field test. New results must be read from the new exact-HEAD CI.

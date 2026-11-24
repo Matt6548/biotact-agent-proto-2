@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           curl --fail --silent --show-error --max-time 60 https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/thumbs_up.jpg -o "$RUNNER_TEMP/hand-fixture.jpg"
-          sha256sum "$RUNNER_TEMP/hand-fixture.jpg"
+          echo "2aee0e3a69ba5f0d3287597e61d265f4f3ac2a44ccec198dddd2639b0c8ef7ba  $RUNNER_TEMP/hand-fixture.jpg" | sha256sum -c -
           echo "HAND_FIXTURE_PATH=$RUNNER_TEMP/hand-fixture.jpg" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - name: Existing camera and resilience browser regression

@@ -26,11 +26,21 @@ for(const delegate of ['auto','CPU']){
     const detected=staticRows.filter(r=>r.handCount===1&&r.landmarkCount===21&&r.finite);
     const blank=result.rows.filter(r=>r.label==='blank');
     const sorted=result.rows.map(r=>r.inferenceMs).sort((a,b)=>a-b);
+    const switched=result.rows.filter(r=>r.delegateChanged);
+    const cadence=result.rows.filter(r=>r.clockMode==='wall');
+    const cadenceStatic=cadence.filter(r=>r.label==='cadence-static');
+    const cadenceMotion=cadence.filter(r=>r.label==='cadence-transformed-photo');
+    const byDelegate={};
+    for(const d of ['GPU','CPU']){
+      const samples=result.rows.filter(r=>r.delegateUsed===d).map(r=>r.inferenceMs).sort((a,b)=>a-b);
+      if(samples.length)byDelegate[d]={samples:samples.length,medianMs:samples[Math.ceil(samples.length*.5)-1],p90Ms:samples[Math.ceil(samples.length*.9)-1]};
+    }
     const pct=(arr,p)=>arr[Math.min(arr.length-1,Math.ceil(arr.length*p)-1)];
     const report={
       source:'https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/thumbs_up.jpg',
       fixtureSHA256:crypto.createHash('sha256').update(bytes).digest('hex'),
-      requestedDelegate:delegate,actualDelegate:result.delegate,initMs:result.initMs,
+      requestedDelegate:delegate,initialDelegate:result.delegate,actualDelegate:result.finalDelegate,initMs:result.initMs,
+      switchCount:switched.length,switchInitMs:switched[0]?.switchInitMs??null,byDelegate,
       inferenceMedianMs:pct(sorted,.5),inferenceP90Ms:pct(sorted,.9),
       workerRoundTripP90Ms:pct(result.rows.map(r=>r.workerRoundTripMs).sort((a,b)=>a-b),.9),
       detectedStaticFrames:detected.length,staticFrames:staticRows.length,
@@ -39,19 +49,43 @@ for(const delegate of ['auto','CPU']){
       transformedPhotoPreviewFrames:result.rows.filter(r=>r.label==='transformed-photo'&&r.preview).length,
       transformedPhotoConfirmed:result.rows.filter(r=>r.label==='transformed-photo'&&r.confirmed).length,
       blankTail:blank.slice(-3).map(r=>r.handCount),
+      cadenceStaticPreviews:cadenceStatic.filter(r=>r.preview).length,
+      cadenceStaticConfirmed:cadenceStatic.filter(r=>r.confirmed).length,
+      cadenceMotionPreviews:cadenceMotion.filter(r=>r.preview).length,
+      cadenceMotionConfirmed:cadenceMotion.filter(r=>r.confirmed).length,
+      cadenceObservedFpsMedian:pct(cadence.slice(12).map(r=>r.observedFps).sort((a,b)=>a-b),.5),
+      cadenceCaptureDeltaP90Ms:pct(cadence.slice(1).map(r=>r.captureDeltaMs).sort((a,b)=>a-b),.9),
+      cadenceRoundTripP90Ms:pct(cadence.map(r=>r.workerRoundTripMs).sort((a,b)=>a-b),.9),
+      simulatedPreviewFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.preview)?.clock??null,
+      simulatedConfirmedFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.confirmed)?.clock??null,
       outgoing,rows:result.rows,
-      limitations:'Actual model on photographed hand pixels; timestamps and image transforms simulated. Not real camera, human gesture accuracy, device FPS or punch force.',
+      limitations:'Actual model on photographed hand pixels. First phase uses simulated timestamps; second uses real elapsed time and inference cadence, but still a transformed photo, not a live person/camera or device FPS.',
     };
     fs.mkdirSync('hand-runtime-evidence',{recursive:true});
     fs.writeFileSync(path.join('hand-runtime-evidence',delegate+'.json'),JSON.stringify(report,null,2));
     await info.attach('numeric model evidence',{body:JSON.stringify(report,null,2),contentType:'application/json'});
+    const {rows,...summary}=report;
+    console.log('HAND_RUNTIME_SUMMARY '+JSON.stringify(summary));
     expect(['GPU','CPU']).toContain(result.delegate);
-    if(delegate==='CPU')expect(result.delegate).toBe('CPU');
+    if(delegate==='CPU'){
+      expect(result.delegate).toBe('CPU');
+      expect(switched).toHaveLength(0);
+    }
+    expect(switched.length).toBeLessThanOrEqual(1);
+    if(switched.length){
+      expect(result.delegate).toBe('GPU');
+      expect(result.finalDelegate).toBe('CPU');
+      expect(switched[0].delegateAfter).toBe('CPU');
+      expect(switched[0].handCount).toBe(0);
+      expect(byDelegate.CPU.samples).toBeGreaterThan(3);
+    }
     expect(Number.isFinite(result.initMs)&&result.initMs>=0).toBeTruthy();
     expect(result.rows.every(r=>Number.isFinite(r.inferenceMs)&&r.inferenceMs>=0)).toBeTruthy();
     expect(detected.length,'real model must find actual landmarks on the public photo').toBeGreaterThanOrEqual(3);
     expect(report.staticPreviews).toBe(0);
     expect(report.staticConfirmed).toBe(0);
+    expect(report.cadenceStaticPreviews).toBe(0);
+    expect(report.cadenceStaticConfirmed).toBe(0);
     expect(report.blankTail).toEqual([0,0,0]);
     expect(outgoing).toEqual([]);
   });

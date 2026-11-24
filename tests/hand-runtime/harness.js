@@ -30,9 +30,14 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   engine.start();
   let clock=0;
   const rows=[];
+  let finalDelegate=null;
+  let wallEpoch=null,wallBase=0,lastCapture=null;
+  let arrivals=[];
   try{
     const init=await request(worker,{type:'init',delegate});
-    async function frame(label,scale,blank=false){
+    finalDelegate=init.delegate;
+    async function frame(label,scale,blank=false,wall=false){
+      if(wall&&lastCapture!==null)await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-lastCapture))));
       ctx.fillStyle='#202020';ctx.fillRect(0,0,640,480);
       if(!blank){
         const fit=Math.min(640/image.width,480/image.height)*scale;
@@ -41,20 +46,41 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
       }
       const bitmap=await createImageBitmap(canvas);
       const before=performance.now();
-      const data=await request(worker,{type:'frame',bitmap,timestampMs:clock},[bitmap]);
-      const result=engine.onFrame({...data,fps:30});
+      const stamp=wall?wallBase+before-wallEpoch:clock;
+      const captureDeltaMs=wall&&lastCapture!==null?before-lastCapture:null;
+      if(wall)lastCapture=before;
+      const data=await request(worker,{type:'frame',bitmap,timestampMs:stamp},[bitmap]);
+      const after=performance.now();
+      if(data.delegateChanged)arrivals=[];
+      if(wall){
+        arrivals.push(after);
+        arrivals=arrivals.filter(t=>after-t<=1000);
+      }
+      finalDelegate=data.delegate??finalDelegate;
+      const fps=wall?arrivals.length:30;
+      const result=engine.onFrame({...data,fps});
       rows.push({
-        label,clock,landmarkCount:data.hands?.[0]?.length??0,handCount:data.hands?.length??0,
+        label,clock:stamp,landmarkCount:data.hands?.[0]?.length??0,handCount:data.hands?.length??0,
+        clockMode:wall?'wall':'simulated',captureDeltaMs,observedFps:wall?fps:null,
+        delegateUsed:data.delegateUsed??finalDelegate,delegateAfter:finalDelegate,
+        delegateChanged:!!data.delegateChanged,switchInitMs:data.switchInitMs??null,
         finite:(data.hands??[]).every(hand=>hand.every(p=>[p.x,p.y,p.z].every(Number.isFinite))),
-        inferenceMs:data.inferenceMs,workerRoundTripMs:performance.now()-before,
+        inferenceMs:data.inferenceMs,workerRoundTripMs:after-before,
         quality:result.analysis.quality.ok,preview:!!result.analysis.previewMotion,confirmed:!!result.strike,
       });
-      engine.tick(.033);clock+=33;
+      engine.tick(wall&&captureDeltaMs!==null?Math.min(.1,captureDeltaMs/1000):.033);
+      if(!wall)clock+=33;
     }
     for(let i=0;i<15;i++)await frame('static',.82);
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('transformed-photo',scale);
     for(let i=0;i<8;i++)await frame('blank',1,true);
-    return {delegate:init.delegate,initMs:init.initMs,rows,finalCount:engine.strikeCount};
+    // Independent phase using actual elapsed timestamps and measured result cadence.
+    engine.pause();engine.resume();
+    wallBase=clock;wallEpoch=performance.now();lastCapture=null;arrivals=[];
+    for(let i=0;i<20;i++)await frame('cadence-static',.72,false,true);
+    for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('cadence-transformed-photo',scale,false,true);
+    for(let i=0;i<5;i++)await frame('cadence-blank',1,true,true);
+    return {delegate:init.delegate,finalDelegate,initMs:init.initMs,rows,finalCount:engine.strikeCount};
   }finally{
     worker.terminate();image.close();engine.stop();
   }
