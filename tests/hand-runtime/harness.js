@@ -6,7 +6,7 @@ function request(worker,message,transfer=[]){
     const timeout=setTimeout(()=>finish(new Error('worker response timeout: '+message.type)),45000);
     const onMessage=({data})=>{
       if(['error','detect-error','egress-blocked'].includes(data.type))finish(new Error(data.type+': '+(data.error??data.origin)));
-      else if((message.type==='init'&&data.type==='ready')||(message.type==='frame'&&data.type==='result'))finish(null,data);
+      else if((message.type==='init'&&data.type==='ready')||(message.type==='frame'&&data.type==='result')||(message.type==='dispose'&&data.type==='disposed'))finish(null,data);
     };
     const onError=event=>finish(new Error(event.message||'worker failed'));
     function finish(error,result){
@@ -26,6 +26,8 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   const canvas=document.createElement('canvas');canvas.width=640;canvas.height=480;
   const ctx=canvas.getContext('2d');
   const worker=new Worker(new URL('../../src/vision/hand-worker.js',import.meta.url),{type:'module'});
+  const privacyAttempts=[];
+  worker.addEventListener('message',({data})=>{if(data.type==='egress-blocked')privacyAttempts.push({origin:data.origin,phase:data.phase});});
   const engine=new FreePracticeEngine({analyzer:new HandForwardAnalyzer({mirrorX:false})});
   engine.start();
   let clock=0;
@@ -80,7 +82,12 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
     for(let i=0;i<20;i++)await frame('cadence-static',.72,false,true);
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('cadence-transformed-photo',scale,false,true);
     for(let i=0;i<5;i++)await frame('cadence-blank',1,true,true);
-    return {delegate:init.delegate,finalDelegate,initMs:init.initMs,rows,finalCount:engine.strikeCount};
+    // Exercise the SDK's periodic timer and close path, not just brief inference.
+    const idleMs=delegate==='CPU'?65000:500;
+    await new Promise(r=>setTimeout(r,idleMs));
+    await request(worker,{type:'dispose'});
+    await new Promise(r=>setTimeout(r,1000));
+    return {delegate:init.delegate,finalDelegate,initMs:init.initMs,rows,finalCount:engine.strikeCount,privacyAttempts,idleMs,disposed:true};
   }finally{
     worker.terminate();image.close();engine.stop();
   }

@@ -1,11 +1,12 @@
 export class PoseTracker {
-  constructor({ video, onResult, onStatus, workerFactory = null }) {
+  constructor({ video, onResult, onStatus, workerFactory = null, workerInit = {} }) {
     this.video = video;
     this.onResult = onResult;
     this.onStatus = onStatus;
     // Keep the existing Pose worker as the default. An opt-in hand worker can
     // reuse the same camera lifecycle without opening a second stream.
     this.workerFactory = workerFactory ?? (() => new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" }));
+    this.workerInit = workerInit;
     this.worker = null;
     this.stream = null;
     this.running = false;
@@ -64,7 +65,7 @@ export class PoseTracker {
       this.worker.onerror = (event) => {
         if (generation===this.generation && this.worker===worker) this.onStatus?.({ state: "error", message: event.message || "Vision worker failed." });
       };
-      this.worker.postMessage({ type: "init" });
+      this.worker.postMessage({ ...this.workerInit, type: "init" });
     } catch (error) {
       this.stop();
       throw error;

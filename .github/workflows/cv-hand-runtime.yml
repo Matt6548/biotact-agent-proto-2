@@ -44,6 +44,7 @@ jobs:
           path: |
             hand-runtime-evidence/*.json
             public/models/hand_landmarker.provenance.txt
+            public/mediapipe/hand-0.10.35/provenance.json
             test-results/**/error-context.md
           if-no-files-found: warn
           retention-days: 7

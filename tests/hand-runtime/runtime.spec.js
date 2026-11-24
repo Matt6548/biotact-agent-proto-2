@@ -58,7 +58,7 @@ for(const delegate of ['auto','CPU']){
       cadenceRoundTripP90Ms:pct(cadence.map(r=>r.workerRoundTripMs).sort((a,b)=>a-b),.9),
       simulatedPreviewFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.preview)?.clock??null,
       simulatedConfirmedFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.confirmed)?.clock??null,
-      outgoing,rows:result.rows,
+      outgoing,privacyAttempts:result.privacyAttempts,idleMs:result.idleMs,disposed:result.disposed,rows:result.rows,
       limitations:'Actual model on photographed hand pixels. First phase uses simulated timestamps; second uses real elapsed time and inference cadence, but still a transformed photo, not a live person/camera or device FPS.',
     };
     fs.mkdirSync('hand-runtime-evidence',{recursive:true});
@@ -88,5 +88,8 @@ for(const delegate of ['auto','CPU']){
     expect(report.cadenceStaticConfirmed).toBe(0);
     expect(report.blankTail).toEqual([0,0,0]);
     expect(outgoing).toEqual([]);
+    expect(result.privacyAttempts).toEqual([]);
+    expect(result.disposed).toBe(true);
+    if(delegate==='CPU')expect(result.idleMs).toBeGreaterThanOrEqual(65000);
   });
 }
