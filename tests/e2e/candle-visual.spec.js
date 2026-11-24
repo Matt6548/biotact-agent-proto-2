@@ -76,14 +76,62 @@ test("OGON flame and shadow render at 360/390/1366/1440 with scoped GPU estimate
         };
         frameId = requestAnimationFrame(sample);
       });
-      return Number(((count - 1) * 1000 / Math.max(1, times[count - 1] - times[0])).toFixed(1));
+      const deltas = times.slice(1).map((t,i)=>t-times[i]).sort((a,b)=>a-b);
+      return { fps: Number(((count - 1) * 1000 / Math.max(1, times[count - 1] - times[0])).toFixed(1)),
+        p50Ms: deltas[Math.floor(deltas.length * 0.5)],
+        p95Ms: deltas[Math.ceil(deltas.length * 0.95)-1] };
     });
     metrics.push({ viewportWidth: width, ...size, ...rendererStats,
-      headlessChromiumFps: headlessFps,
+      headlessChromiumFps: headlessFps.fps,
+      frameP50Ms: headlessFps.p50Ms, frameP95Ms: headlessFps.p95Ms,
       fpsWarning: "CI/headless-browser sample only; NOT Redmi Note 9S FPS or GPU time" });
   }
   await writeFile(testInfo.outputPath("candle-render-metrics.json"),
     JSON.stringify(metrics, null, 2));
   expect(pageErrors).toEqual([]);
   expect(shaderErrors).toEqual([]);
+});
+
+test("real WebGL canvas: side deflection, extinction, smoke and manual relight", async ({ page }, testInfo) => {
+  test.setTimeout(120_000);
+  const errors = [];
+  page.on("pageerror", e => errors.push(e.message));
+  page.on("console", m => {
+    if (m.type() === "error" && /WebGLProgram|Shader Error|compile/i.test(m.text())) errors.push(m.text());
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  const target = page.locator("#target-canvas");
+  const canvas = target.locator("canvas");
+  await expect(target).toHaveAttribute("data-renderer-kind", "webgl");
+  const stats = () => canvas.evaluate(c => c.candleRenderStats());
+  await expect.poll(async () => (await stats()).flameAlive).toBeGreaterThan(0.95);
+  expect((await stats()).cameraFov).toBe(46);
+  const observations = [{ phase:"steady", ...await stats() }];
+  await target.screenshot({path:testInfo.outputPath("01-steady.png")});
+  // Exercise the existing engineering simulation form, not a test-only renderer API.
+  const strike = (speed, alignment, distance) => page.evaluate(({speed,alignment,distance}) => {
+    for (const [id,value] of Object.entries({speed,alignment,distance})) {
+      const input = document.getElementById(id);
+      input.value = String(value);
+      input.dispatchEvent(new Event("input", {bubbles:true}));
+    }
+    document.getElementById("controls").requestSubmit();
+  }, {speed,alignment,distance});
+  await strike(7,0.9,0.3);
+  await expect.poll(async () => (await stats()).flameTilt).toBeGreaterThan(0.03);
+  observations.push({phase:"side", ...await stats()});
+  await target.screenshot({path:testInfo.outputPath("02-deflected.png")});
+  await strike(12,1,0.1);
+  await expect.poll(async () => (await stats()).flameAlive).toBeLessThan(0.12);
+  await expect.poll(async () => (await stats()).smokeOpacity).toBeGreaterThan(0.12);
+  observations.push({phase:"extinguished", ...await stats()});
+  await target.screenshot({path:testInfo.outputPath("03-smoke.png")});
+  await page.locator("#reset").click();
+  await expect.poll(async () => (await stats()).flameAlive).toBeGreaterThan(0.95);
+  expect((await stats()).smokeOpacity).toBe(0);
+  observations.push({phase:"relight", ...await stats()});
+  await target.screenshot({path:testInfo.outputPath("04-relight.png")});
+  await writeFile(testInfo.outputPath("lifecycle-metrics.json"), JSON.stringify(observations,null,2));
+  expect(errors).toEqual([]);
 });
