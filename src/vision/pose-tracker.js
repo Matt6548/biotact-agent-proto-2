@@ -113,6 +113,15 @@ export class PoseTracker {
 
     if (data.type === "result") {
       this.frameBusy = false;
+      if(data.delegateChanged&&data.delegate==="CPU"){
+        this.delegate="CPU";
+        this.frameTimes=[];
+        this.busySkipTimes=[];
+        // Empty transition frame resets the hand analyzer in onResult below.
+        this.onStatus?.({state:"ready",mode:"hands",delegate:"CPU",
+          message:"Hand model ready · CPU",fallback:"slow-gpu",
+          initMs:Number.isFinite(data.switchInitMs)?data.switchInitMs:null});
+      }
       const now = performance.now();
       this.frameTimes.push(now);
       this.pruneWindow(this.frameTimes, now);

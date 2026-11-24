@@ -1,7 +1,5 @@
 name: CV hand runtime isolated QA
 on:
-  push:
-    branches: [cv/hand-live-response-20261124]
   pull_request:
     branches: [integration/candle-v2-review-20261124]
     paths:
@@ -24,7 +22,8 @@ jobs:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
       - run: npm test
-      - run: npm run prepare:vision
+      - name: Default app build (Pose path, no hand model in default dist)
+        run: npm run build
       - run: node scripts/prepare-hand-landmarker-assets.mjs
       - name: Download public official sample for isolated model test
         shell: bash
@@ -33,6 +32,8 @@ jobs:
           sha256sum "$RUNNER_TEMP/hand-fixture.jpg"
           echo "HAND_FIXTURE_PATH=$RUNNER_TEMP/hand-fixture.jpg" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
+      - name: Existing camera and resilience browser regression
+        run: npx playwright test --project=camera-chromium --project=camera-mobile-chromium --project=resilience-chromium
       - run: npx vite build --config tests/hand-runtime/vite.config.js
       - run: npx playwright test --config playwright.hand.config.js
       - uses: actions/upload-artifact@v4

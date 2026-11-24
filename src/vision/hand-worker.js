@@ -1,4 +1,5 @@
 /* Opt-in Hand Landmarker worker. No raw frames or hand sequences leave this worker. */
+import {HandDelegateLatencyGate} from './hand-runtime-policy.js';
 let FilesetResolver;
 let HandLandmarker;
 const BASE=(import.meta.env.BASE_URL||'/').replace(/\/?$/,'/');
@@ -8,6 +9,9 @@ const MODEL_URL=sameOrigin('models/hand_landmarker.task');
 let landmarker=null;
 let processing=false;
 let guardInstalled=false;
+let activeDelegate=null;
+let cpuFallbackAssets=null;
+const latencyGate=new HandDelegateLatencyGate();
 
 function installEgressGuard(){
   if(guardInstalled)return;
@@ -20,7 +24,8 @@ function installEgressGuard(){
       self.postMessage({type:'egress-blocked',origin:target.origin});
       return Promise.reject(new TypeError('Hand worker external request blocked'));
     }
-    return nativeFetch(input,options);
+    // Same-origin redirects are unnecessary for pinned static assets.
+    return nativeFetch(input,{...options,redirect:'error'});
   };
   if(globalThis.XMLHttpRequest?.prototype){
     const open=globalThis.XMLHttpRequest.prototype.open;
@@ -56,14 +61,19 @@ async function init(preferredDelegate){
   const model=new Uint8Array(await response.arrayBuffer());
   if(preferredDelegate==='CPU'){
     landmarker=await create(vision,model,'CPU');
+    activeDelegate='CPU';
     self.postMessage({type:'ready',delegate:'CPU',initMs:performance.now()-started,assetOrigin:self.location.origin,mode:'hands'});
     return;
   }
   try{
     landmarker=await create(vision,model,'GPU');
+    activeDelegate='GPU';
+    cpuFallbackAssets={vision,model};
     self.postMessage({type:'ready',delegate:'GPU',initMs:performance.now()-started,assetOrigin:self.location.origin,mode:'hands'});
   }catch(error){
     landmarker=await create(vision,model,'CPU');
+    activeDelegate='CPU';
+    cpuFallbackAssets=null;
     self.postMessage({type:'ready',delegate:'CPU',initMs:performance.now()-started,assetOrigin:self.location.origin,mode:'hands',fallback:'GPU initialization failed'});
   }
 }
@@ -78,10 +88,28 @@ self.onmessage=async({data})=>{
   processing=true;
   const started=performance.now();
   try{
+    const delegateUsed=activeDelegate;
     const result=landmarker.detectForVideo(bitmap,data.timestampMs);
-    // Only numeric landmarks cross to the main thread; no ImageBitmap or pixels.
+    const inferenceMs=performance.now()-started;
+    let delegateChanged=false;
+    let switchInitMs=null;
+    if(cpuFallbackAssets&&latencyGate.observe(inferenceMs,activeDelegate)){
+      // Close the GPU graph before creating the CPU graph. Same worker,
+      // same camera, one-time fallback. Discard transition landmarks.
+      const fallbackStarted=performance.now();
+      const {vision,model}=cpuFallbackAssets;
+      cpuFallbackAssets=null;
+      landmarker.close();
+      landmarker=null;
+      landmarker=await create(vision,model,'CPU');
+      activeDelegate='CPU';
+      delegateChanged=true;
+      switchInitMs=performance.now()-fallbackStarted;
+    }
+    // Only transient numeric landmarks cross to the main thread, never pixels.
     self.postMessage({type:'result',timestampMs:data.timestampMs,
-      inferenceMs:performance.now()-started,hands:result.landmarks??[],
+      inferenceMs,delegateUsed,delegate:activeDelegate,delegateChanged,switchInitMs,
+      hands:delegateChanged?[]:(result.landmarks??[]),
       landmarks:null,worldLandmarks:null});
   }catch(error){self.postMessage({type:'detect-error',error:String(error?.message||error)});}
   finally{bitmap?.close?.();processing=false;}
