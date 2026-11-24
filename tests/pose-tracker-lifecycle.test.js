@@ -114,3 +114,42 @@ test("camera status switches from permission request to model loading once video
     else delete globalThis.Worker;
   }
 });
+
+test("optional injected worker uses the same exclusive camera and stop cleanup", async () => {
+  const priorNavigator=Object.getOwnPropertyDescriptor(globalThis,"navigator");
+  let stoppedTracks=0,terminated=0,constructed=0;
+  const stream={getTracks:()=>[{stop:()=>stoppedTracks++}]};
+  Object.defineProperty(globalThis,"navigator",{configurable:true,
+    value:{mediaDevices:{getUserMedia:async()=>stream}}});
+  try{
+    const tracker=new PoseTracker({
+      video:{srcObject:null,async play(){}},
+      workerFactory:()=>{
+        constructed++;
+        return {postMessage(){},terminate(){terminated++;}};
+      },
+    });
+    tracker.scheduleFrame=()=>{};
+    await tracker.start();
+    assert.equal(constructed,1);
+    assert.equal(tracker.running,true);
+    tracker.stop();
+    assert.equal(stoppedTracks,1);
+    assert.equal(terminated,1);
+    assert.equal(tracker.stream,null);
+  }finally{
+    if(priorNavigator)Object.defineProperty(globalThis,"navigator",priorNavigator);
+    else delete globalThis.navigator;
+  }
+});
+
+test("hand-ready status exposes delegate and model init time without touching the camera",()=>{
+ const events=[];
+ const tracker=new PoseTracker({video:{},onStatus:(event)=>events.push(event)});
+ tracker.handleWorkerMessage({type:"ready",mode:"hands",delegate:"CPU",initMs:82});
+ assert.equal(events.length,1);
+ assert.equal(events[0].mode,"hands");
+ assert.equal(events[0].initMs,82);
+ assert.equal(events[0].delegate,"CPU");
+ assert.match(events[0].message,/Hand model ready/);
+});

@@ -1,8 +1,11 @@
 export class PoseTracker {
-  constructor({ video, onResult, onStatus }) {
+  constructor({ video, onResult, onStatus, workerFactory = null }) {
     this.video = video;
     this.onResult = onResult;
     this.onStatus = onStatus;
+    // Keep the existing Pose worker as the default. An opt-in hand worker can
+    // reuse the same camera lifecycle without opening a second stream.
+    this.workerFactory = workerFactory ?? (() => new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" }));
     this.worker = null;
     this.stream = null;
     this.running = false;
@@ -53,7 +56,7 @@ export class PoseTracker {
     this.onStatus?.({ state: "loading", message: "Камера включена · загружаем распознавание…" });
 
     try {
-      this.worker = new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" });
+      this.worker = this.workerFactory();
       this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
       this.worker.onerror = (event) => {
         this.onStatus?.({ state: "error", message: event.message || "Pose worker failed." });
@@ -94,8 +97,10 @@ export class PoseTracker {
       this.modelReady = true;
       this.onStatus?.({
         state: "ready",
-        message: `Pose model ready · ${this.delegate}`,
+        message: data.mode === "hands" ? `Hand model ready · ${this.delegate}` : `Pose model ready · ${this.delegate}`,
         delegate: this.delegate,
+        mode: data.mode || "pose",
+        initMs: Number.isFinite(data.initMs) ? data.initMs : null,
       });
       return;
     }
