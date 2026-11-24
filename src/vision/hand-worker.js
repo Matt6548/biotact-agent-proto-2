@@ -43,7 +43,7 @@ async function create(vision,model,delegate){
     minTrackingConfidence:.65,
   });
 }
-async function init(){
+async function init(preferredDelegate){
   const started=performance.now();
   installEgressGuard();
   const sdk=await import('@mediapipe/tasks-vision');
@@ -54,6 +54,11 @@ async function init(){
   const response=await fetch(MODEL_URL,{cache:'force-cache'});
   if(!response.ok)throw new Error('Local hand model unavailable: '+response.status);
   const model=new Uint8Array(await response.arrayBuffer());
+  if(preferredDelegate==='CPU'){
+    landmarker=await create(vision,model,'CPU');
+    self.postMessage({type:'ready',delegate:'CPU',initMs:performance.now()-started,assetOrigin:self.location.origin,mode:'hands'});
+    return;
+  }
   try{
     landmarker=await create(vision,model,'GPU');
     self.postMessage({type:'ready',delegate:'GPU',initMs:performance.now()-started,assetOrigin:self.location.origin,mode:'hands'});
@@ -64,7 +69,7 @@ async function init(){
 }
 self.onmessage=async({data})=>{
   if(data?.type==='init'){
-    try{await init();}catch(error){self.postMessage({type:'error',error:String(error?.message||error)});}
+    try{await init(data.delegate);}catch(error){self.postMessage({type:'error',error:String(error?.message||error)});}
     return;
   }
   if(data?.type!=='frame')return;

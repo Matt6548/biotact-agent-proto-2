@@ -24,11 +24,13 @@ export class FreePracticeEngine {
     this.strikeCount = 0;
     this.recentPeaks = [];
     this.lastSessionCount = 0;
+    this.previewTilt = 0;
   }
 
   start() {
     if (this.state !== "preview") return this.snapshot();
     this.analyzer.resetMotionState();
+    this.previewTilt = 0;
     this.flame.reset();
     this.strikeCount = 0;
     this.recentPeaks = [];
@@ -39,6 +41,7 @@ export class FreePracticeEngine {
   pause() {
     if (this.state === "practicing" || this.state === "framing") {
       this.state = "paused";
+      this.previewTilt = 0;
       this.analyzer.resetMotionState();
     }
     return this.snapshot();
@@ -55,6 +58,7 @@ export class FreePracticeEngine {
   stop() {
     if (this.state !== "preview") this.lastSessionCount = this.strikeCount;
     this.state = "preview";
+    this.previewTilt = 0;
     this.analyzer.resetMotionState();
     this.flame.reset();
     this.recentPeaks = [];
@@ -63,14 +67,29 @@ export class FreePracticeEngine {
 
   relight() {
     if (this.state === "practicing" || this.state === "framing" || this.state === "paused") {
+      this.previewTilt = 0;
+      this.analyzer.resetMotionState();
       this.flame.reset();
     }
     return this.snapshot();
   }
 
   tick(dtSeconds) {
-    if (this.state === "practicing" || this.state === "framing") this.flame.step(dtSeconds);
-    return this.flame.snapshot();
+    if (this.state === "practicing" || this.state === "framing") {
+      this.flame.step(dtSeconds);
+      const dt = Number.isFinite(dtSeconds) ? clamp(dtSeconds,0,.1) : 0;
+      this.previewTilt *= Math.exp(-dt*10);
+      if (Math.abs(this.previewTilt)<.001) this.previewTilt=0;
+    }
+    return this.visualFlame();
+  }
+
+  visualFlame() {
+    const flame=this.flame.snapshot();
+    if (flame.extinguished || !this.previewTilt) return flame;
+    const tilt=clamp(flame.tilt+this.previewTilt,-1,1);
+    const instability=clamp(Math.max(flame.instability,Math.abs(this.previewTilt)*.7),0,1);
+    return {...flame,tilt,instability,stability:1-instability};
   }
 
   onFrame(frame) {
@@ -81,7 +100,15 @@ export class FreePracticeEngine {
     if (!analysis.quality.ok) this.state = "framing";
     else this.state = "practicing";
 
-    const strike = analysis.strike;
+    const strike = analysis.quality.ok ? analysis.strike : null;
+    const preview = analysis.previewMotion;
+    // Preview is a bounded overlay, not repeated impulses into the oscillator.
+    // It cannot extinguish the flame or increment the confirmed-motion counter.
+    if (!analysis.quality.ok || strike || this.flame.snapshot().extinguished) this.previewTilt=0;
+    else if (preview && Number.isFinite(preview.strength) && Number.isFinite(preview.direction)) {
+      const target=clamp(preview.strength,0,.55)*Math.sign(preview.direction)*.35;
+      this.previewTilt=clamp(.45*this.previewTilt+.55*target,-.193,.193);
+    }
     let response = null;
     if (strike) {
       // Before an individual reference exists use a deliberately conservative
@@ -119,7 +146,7 @@ export class FreePracticeEngine {
       lastSessionCount: this.lastSessionCount,
       referenceStatus: this.recentPeaks.length >= 4 ? "personalized" : "learning",
       referenceSamples: this.recentPeaks.length,
-      flame: this.flame.snapshot(),
+      flame: this.visualFlame(),
     };
   }
 }
