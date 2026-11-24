@@ -2,7 +2,7 @@ import * as THREE from "three";
 
 /** A modestly irregular, single-draw-call candle with an inset melted-wax well. */
 export function createWaxGeometry({ segments = 72 } = {}) {
-  const count = Math.max(24, Math.floor(segments));
+  const count = Math.min(96, Math.max(24, Number.isFinite(segments) ? Math.floor(segments) : 72));
   const positions = [];
   const colors = [];
   const indices = [];
@@ -12,8 +12,8 @@ export function createWaxGeometry({ segments = 72 } = {}) {
     { radius: 0.535, height: 1.075, well: 0.012 },
     { radius: 0.485, height: 1.064, well: 0.016 },
     { radius: 0.395, height: 1.015, well: 0.018 },
-    { radius: 0.22, height: 1.005, well: 0.012 },
-    { radius: 0.035, height: 1.012, well: 0.003 },
+    { radius: 0.22, height: 0.990, well: 0.012 },
+    { radius: 0.035, height: 0.997, well: 0.003 },
   ];
 
   for (let r = 0; r < rings.length; r += 1) {
@@ -63,7 +63,7 @@ export function createWaxGeometry({ segments = 72 } = {}) {
 
   // The last top ring is small; close its centre instead of leaving a hole.
   const centre = positions.length / 3;
-  positions.push(0, 1.013, 0);
+  positions.push(0, 0.998, 0);
   colors.push(wax.r, wax.g, wax.b);
   const last = (rings.length - 1) * (count + 1);
   for (let i = 0; i < count; i += 1) indices.push(last + i, centre, last + i + 1);
@@ -73,6 +73,16 @@ export function createWaxGeometry({ segments = 72 } = {}) {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
+  // The duplicated angular seam must have identical smooth normals.
+  const normals = geometry.getAttribute("normal");
+  const normal = new THREE.Vector3();
+  for (let r = 0; r < rings.length; r += 1) {
+    const a = r * (count + 1), b = a + count;
+    normal.set(normals.getX(a) + normals.getX(b), normals.getY(a) + normals.getY(b), normals.getZ(a) + normals.getZ(b)).normalize();
+    normals.setXYZ(a, normal.x, normal.y, normal.z);
+    normals.setXYZ(b, normal.x, normal.y, normal.z);
+  }
+  normals.needsUpdate = true;
   geometry.computeBoundingSphere();
   return geometry;
 }
