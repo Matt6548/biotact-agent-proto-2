@@ -7,6 +7,8 @@ uniform float uInstability;
 uniform float uImpact;
 uniform float uLayer;
 uniform float uPhase;
+uniform float uAlive;
+uniform float uHalfHeight;
 void main() {
   vUv = uv;
   vec3 p = position;
@@ -15,8 +17,11 @@ void main() {
   float slowSway = sin(uTime * 3.7 + uv.y * 5.4 + uPhase) * 0.039;
   float fineMotion = sin(uTime * 10.3 + uv.y * 14.0 + uPhase) * 0.012;
   float asymmetry = -0.044 + slowSway + fineMotion;
-  p.x += rise * rise * (uTilt * 0.34 + asymmetry * (0.8 + uInstability + uImpact));
-  p.x += uLayer * 0.022 * sin(uv.y * 5.0 + uPhase);
+  float strain = clamp(abs(uTilt) * 0.62 + uInstability * 0.28 + uImpact * 0.16, 0.0, 1.0);
+  float heightScale = mix(0.12, 1.0, sqrt(clamp(uAlive, 0.0, 1.0))) * (1.0 - 0.24 * strain);
+  p.y = (p.y + uHalfHeight) * heightScale - uHalfHeight;
+  p.x += rise * rise * (uTilt * 0.42 + asymmetry * (0.8 + uInstability + uImpact)) * heightScale;
+  p.x += rise * uLayer * 0.022 * sin(uv.y * 5.0 + uPhase);
   p.y += sin(uTime * 6.3 + uv.x * 6.2 + uPhase) * rise * 0.008 * (uInstability + uImpact);
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }`;
@@ -44,8 +49,12 @@ void main() {
   float spread = abs(dx) / max(width, 0.012);
   float contour = 1.0 - smoothstep(0.68, 1.07, spread);
   float ends = smoothstep(0.0, 0.055, y) * (1.0 - smoothstep(0.960, 1.0, y));
-  float core = exp(-5.5 * spread * spread) * smoothstep(0.07, 0.27, y)
-    * (1.0 - smoothstep(0.72, 0.95, y));
+  // Luminous soot zone, not a solid yellow disk: soften the edge and leave
+  // the fuel-vapour region around the wick darker.
+  float internalRipple = 0.94 + 0.06 * sin(uTime * 6.1 - y * 15.0 + vUv.x * 7.0 + uPhase);
+  float core = exp(-3.6 * spread * spread) * smoothstep(0.15, 0.39, y)
+    * (1.0 - smoothstep(0.78, 0.98, y)) * internalRipple;
+  float darkFoot = exp(-13.0 * spread * spread) * (1.0 - smoothstep(0.08, 0.26, y));
   vec3 orangeShell = vec3(0.94, 0.265, 0.035);
   vec3 honey = vec3(1.0, 0.68, 0.16);
   vec3 whiteCore = vec3(1.0, 0.97, 0.80);
@@ -53,10 +62,11 @@ void main() {
   flame = mix(flame, whiteCore, core * 0.96 * (1.0 - uLayer));
   // Brief blue foot around the wick, rapidly giving way to warm incandescence.
   flame = mix(vec3(0.13, 0.29, 0.90), flame, smoothstep(0.025, 0.145, y));
-  flame = mix(flame, orangeShell, uLayer * 0.42);
+  flame = mix(flame, orangeShell, uLayer * 0.32);
+  flame = mix(flame, vec3(0.12, 0.085, 0.06), darkFoot * 0.65);
   float breathe = 0.95 + 0.05 * sin(uTime * 7.9 + y * 7.0 + uPhase);
   float layerOpacity = mix(0.96, 0.24, uLayer);
-  float alpha = contour * ends * breathe * layerOpacity * uAlive;
+  float alpha = contour * ends * breathe * layerOpacity * uAlive * (1.0 - 0.27 * darkFoot);
   if (alpha < 0.008) discard;
   gl_FragColor = vec4(flame, alpha);
 }`;
@@ -91,7 +101,8 @@ varying float vFade;
 void main() {
   vec2 centre = gl_PointCoord - vec2(0.5);
   float distanceFromCentre = length(centre);
-  float feather = 1.0 - smoothstep(0.12, 0.49, distanceFromCentre);
+  float feather = exp(-16.0 * distanceFromCentre * distanceFromCentre)
+    * (1.0 - smoothstep(0.34, 0.50, distanceFromCentre));
   float alpha = feather * vFade * uOpacity;
   if (alpha < 0.002) discard;
   gl_FragColor = vec4(0.56, 0.57, 0.57, alpha);

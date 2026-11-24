@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as THREE from "three";
 import { createWaxGeometry } from "../src/render/candle-geometry.js";
-import { CandleRenderer, createCandleCamera } from "../src/render/candle-renderer.js";
+import { CandleRenderer, createCandleCamera, approachVisual } from "../src/render/candle-renderer.js";
 import {
   flameVertexShader, flameFragmentShader, glowFragmentShader,
   smokeVertexShader, smokeFragmentShader,
@@ -195,5 +195,69 @@ test("default camera keeps tray and bent flame within the four verified viewport
         "default camera should leave a screen margin at aspect " + aspect);
       assert.ok(p.z > -1 && p.z < 1);
     }
+  }
+});
+
+test("visual decay is independent of 20, 30, 60 and 120 fps for equal elapsed time", () => {
+  for (const fps of [20, 30, 60, 120]) {
+    let value = 1, tilt = 0;
+    for (let i = 0; i < fps; i++) {
+      value = approachVisual(value, 0, 14, 1/fps);
+      tilt = approachVisual(tilt, -0.82, 17, 1/fps);
+    }
+    assert.ok(Math.abs(value - Math.exp(-14)) < 1e-10);
+    assert.ok(Math.abs(tilt - (-0.82 + 0.82*Math.exp(-17))) < 1e-10);
+  }
+});
+
+test("extinction captures signed deflection and direct relight clears residual smoke", () => {
+  const renderer = Object.create(CandleRenderer.prototype);
+  renderer.state = { extinguished: false, tilt: 0 };
+  renderer.wasExtinguished = false;
+  renderer.smokeLife = 0;
+  renderer.smokeUniforms = { uOpacity: { value: 0.4 } };
+  renderer.smoke = { visible: true };
+  renderer.setState({ tilt: -0.8, extinguished: true });
+  assert.equal(renderer.smokeDirection, -0.8);
+  assert.equal(renderer.smokeLife, 1);
+  renderer.setState({ instability: 0.6 });
+  assert.equal(renderer.smokeDirection, -0.8);
+  renderer.setState({ extinguished: false });
+  assert.equal(renderer.smokeLife, 0);
+  assert.equal(renderer.smokeUniforms.uOpacity.value, 0);
+  assert.equal(renderer.smoke.visible, false);
+  renderer.setState({ extinguished: true, tilt: 0.7 });
+  assert.equal(renderer.smokeDirection, 0.7);
+});
+
+test("smoke waits for flame collapse and the 46 degree framing stays unchanged", () => {
+  const renderer = Object.create(CandleRenderer.prototype);
+  renderer.smokeLife = 1;
+  renderer.flameUniforms = { uAlive: { value: 0.5 } };
+  renderer.smokeUniforms = { uOpacity: { value: 0.4 } };
+  renderer.smoke = { visible: true };
+  renderer.updateSmoke(0.05, 0.2);
+  assert.equal(renderer.smokeLife, 1);
+  assert.equal(renderer.smokeUniforms.uOpacity.value, 0);
+  assert.equal(renderer.smoke.visible, false);
+  assert.equal(createCandleCamera().fov, 46);
+  assert.match(flameVertexShader, /uHalfHeight/);
+  assert.match(flameFragmentShader, /darkFoot/);
+});
+
+test("wax seam normals match and invalid tessellation stays bounded", () => {
+  for (const segments of [72, NaN, Infinity, 10000]) {
+    const geometry = createWaxGeometry({ segments });
+    const count = segments === 10000 ? 96 : 72;
+    const normals = geometry.getAttribute("normal");
+    for (let ring = 0; ring < 18; ring++) {
+      const a = ring*(count+1), b = a+count;
+      assert.equal(normals.getX(a), normals.getX(b));
+      assert.equal(normals.getY(a), normals.getY(b));
+      assert.equal(normals.getZ(a), normals.getZ(b));
+    }
+    assert.ok([...normals.array].every(Number.isFinite));
+    assert.ok(geometry.getAttribute("position").count <= 1750);
+    geometry.dispose();
   }
 });
