@@ -2,6 +2,9 @@ import { test, expect } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 
 test("OGON flame and shadow render at 360/390/1366/1440 with scoped GPU estimates", async ({ page }, testInfo) => {
+  // Four viewport screenshots and 104 animation-frame samples share a software GPU in CI.
+  // Keep all render assertions; give this multi-viewport test its own bounded budget.
+  test.setTimeout(120_000);
   const pageErrors = [];
   const shaderErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -52,16 +55,26 @@ test("OGON flame and shadow render at 360/390/1366/1440 with scoped GPU estimate
     expect(rendererStats.drawCalls).toBeGreaterThan(5);
     expect(rendererStats.drawCalls).toBeLessThanOrEqual(22);
     expect(rendererStats.triangles).toBeLessThan(12000);
+    // Visibility matters: background tabs can throttle requestAnimationFrame.
+    await page.bringToFront();
+    await expect.poll(() => page.evaluate(() => document.visibilityState)).toBe("visible");
     const headlessFps = await page.evaluate(async () => {
       const count = 26;
       const times = [];
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
+        let frameId;
+        const deadline = setTimeout(() => {
+          cancelAnimationFrame(frameId);
+          reject(new Error("Timed out collecting 26 visible animation frames"));
+        }, 20_000);
         const sample = (t) => {
           times.push(t);
-          if (times.length >= count) resolve();
-          else requestAnimationFrame(sample);
+          if (times.length >= count) {
+            clearTimeout(deadline);
+            resolve();
+          } else frameId = requestAnimationFrame(sample);
         };
-        requestAnimationFrame(sample);
+        frameId = requestAnimationFrame(sample);
       });
       return Number(((count - 1) * 1000 / Math.max(1, times[count - 1] - times[0])).toFixed(1));
     });
