@@ -72,6 +72,11 @@ for(const delegate of ['auto','CPU']){
       expect(switched).toHaveLength(0);
     }
     expect(switched.length).toBeLessThanOrEqual(1);
+    if(delegate==='auto'&&result.delegate==='GPU'){
+      const gpu=result.rows.filter(r=>r.delegateUsed==='GPU').slice(2);
+      const needsSwitch=gpu.some((_,i)=>gpu.slice(i,i+3).length===3&&gpu.slice(i,i+3).every(r=>r.inferenceMs>120));
+      if(needsSwitch)expect(switched.length,'sustained slow GPU must actually switch').toBe(1);
+    }
     if(switched.length){
       expect(result.delegate).toBe('GPU');
       expect(result.finalDelegate).toBe('CPU');
@@ -86,6 +91,9 @@ for(const delegate of ['auto','CPU']){
     expect(report.staticConfirmed).toBe(0);
     expect(report.cadenceStaticPreviews).toBe(0);
     expect(report.cadenceStaticConfirmed).toBe(0);
+    expect(report.transformedPhotoPreviewFrames).toBeGreaterThan(0);
+    expect(report.transformedPhotoConfirmed).toBe(1);
+    expect(report.simulatedPreviewFirstMs).toBeLessThan(report.simulatedConfirmedFirstMs);
     expect(report.blankTail).toEqual([0,0,0]);
     expect(outgoing).toEqual([]);
     expect(result.privacyAttempts).toEqual([]);

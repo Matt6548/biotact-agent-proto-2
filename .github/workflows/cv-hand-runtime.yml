@@ -34,9 +34,6 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npx vite build --config tests/hand-runtime/vite.config.js
       - run: npx playwright test --config playwright.hand.config.js
-      - name: Existing camera and resilience browser regression (serial, focus-sensitive)
-        if: always()
-        run: npx playwright test --workers=1 --project=camera-chromium --project=camera-mobile-chromium --project=resilience-chromium
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -45,6 +42,15 @@ jobs:
             hand-runtime-evidence/*.json
             public/models/hand_landmarker.provenance.txt
             public/mediapipe/hand-0.10.35/provenance.json
-            test-results/**/error-context.md
           if-no-files-found: warn
+          retention-days: 7
+      - name: Existing camera and resilience browser regression (serial, focus-sensitive)
+        if: always()
+        run: npx playwright test --workers=1 --project=camera-chromium --project=camera-mobile-chromium --project=resilience-chromium
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hand-pose-regression-errors
+          path: test-results/**/error-context.md
+          if-no-files-found: ignore
           retention-days: 7

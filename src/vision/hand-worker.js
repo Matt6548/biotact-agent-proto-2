@@ -14,11 +14,18 @@ let phase='new';
 let initialized=false;
 let disposed=false;
 let activeDelegate=null;
+let graphCreations=0;
 let cpuFallbackAssets=null;
 const latencyGate=new HandDelegateLatencyGate();
 
 async function create(vision,model,delegate){
-  return HandLandmarker.createFromOptions(vision,{
+  // 0.10.35 consumes and clears self.ModuleFactory. The module loader is
+  // cached by URL; a second graph needs the same pinned LOCAL loader bytes
+  // under a distinct, bounded module identity. No eval or external origin.
+  const loader=new URL(vision.wasmLoaderPath,self.location.href);
+  loader.searchParams.set('graph',String(++graphCreations));
+  if(graphCreations>2)throw new Error('Hand graph creation limit exceeded');
+  return HandLandmarker.createFromOptions({...vision,wasmLoaderPath:loader.href},{
     baseOptions:{modelAssetBuffer:model,delegate},
     runningMode:'VIDEO',numHands:2,
     minHandDetectionConfidence:.65,
