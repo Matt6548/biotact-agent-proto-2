@@ -9,11 +9,11 @@ for(const delegate of ['auto','CPU']){
     expect(fixture,'public hand fixture required').toBeTruthy();
     const bytes=fs.readFileSync(fixture);
     const outgoing=[];
-    page.on('request',req=>{
+    page.context().on('request',req=>{
       const url=new URL(req.url());
       if(['http:','https:'].includes(url.protocol)&&url.origin!=='http://127.0.0.1:4189')outgoing.push(url.origin);
     });
-    await page.route('**/*',route=>{
+    await page.context().route('**/*',route=>{
       const url=new URL(route.request().url());
       return ['http:','https:'].includes(url.protocol)&&url.origin!=='http://127.0.0.1:4189'?route.abort():route.continue();
     });
@@ -93,3 +93,26 @@ for(const delegate of ['auto','CPU']){
     if(delegate==='CPU')expect(result.idleMs).toBeGreaterThanOrEqual(65000);
   });
 }
+
+test('reproduce legacy 1.1.1 close-path egress without external transport',async({page})=>{
+ const bytes=fs.readFileSync(process.env.HAND_FIXTURE_PATH);
+ const external=[];
+ await page.context().route('**/*',route=>{
+   const url=new URL(route.request().url());
+   if(['http:','https:'].includes(url.protocol)&&url.origin!=='http://127.0.0.1:4189'){
+     external.push(url.origin);return route.abort();
+   }
+   return route.continue();
+ });
+ await page.goto('/tests/hand-runtime/harness.html');
+ await page.waitForFunction(()=>typeof window.runLegacyHandProbe==='function');
+ const result=await page.evaluate(base64=>window.runLegacyHandProbe(base64),bytes.toString('base64'));
+ fs.mkdirSync('hand-runtime-evidence',{recursive:true});
+ const report={...result,external,scope:'Deliberate old-SDK public-image diagnostic, never the new runtime.'};
+ fs.writeFileSync('hand-runtime-evidence/legacy-close.json',JSON.stringify(report,null,2));
+ console.log('LEGACY_HAND_PROBE '+JSON.stringify(report));
+ expect(result.frames).toBe(6);
+ expect(result.attempts.some(a=>a.origin==='https://odml.pa.googleapis.com'&&a.phase==='legacy-close')).toBe(true);
+ expect(result.blocked).toBe(true);
+ expect(external).toEqual([]);
+});

@@ -92,3 +92,17 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
     worker.terminate();image.close();engine.stop();
   }
 };
+
+window.runLegacyHandProbe=async(imageBase64)=>{
+ const bytes=Uint8Array.from(atob(imageBase64),c=>c.charCodeAt(0));
+ const bitmap=await createImageBitmap(new Blob([bytes],{type:'image/jpeg'}));
+ const worker=new Worker(new URL('./legacy-probe-worker.js',import.meta.url),{type:'module'});
+ try{
+   return await new Promise((resolve,reject)=>{
+     const timer=setTimeout(()=>reject(new Error('legacy probe timeout')),60000);
+     worker.onmessage=({data})=>{if(data.type==='probe-result'){clearTimeout(timer);resolve(data);}};
+     worker.onerror=e=>{clearTimeout(timer);reject(new Error(e.message||'legacy probe worker error'));};
+     worker.postMessage({type:'probe',bitmap},[bitmap]);
+   });
+ }finally{worker.terminate();}
+};
