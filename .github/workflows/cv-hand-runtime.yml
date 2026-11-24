@@ -1,0 +1,46 @@
+name: CV hand runtime isolated QA
+on:
+  push:
+    branches: [cv/hand-live-response-20261124]
+  pull_request:
+    branches: [integration/candle-v2-review-20261124]
+    paths:
+      - 'src/vision/**'
+      - 'src/features/free-practice.js'
+      - 'tests/hand*'
+      - 'tests/hand-runtime/**'
+      - 'playwright.hand.config.js'
+      - '.github/workflows/cv-hand-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - run: npm run prepare:vision
+      - run: node scripts/prepare-hand-landmarker-assets.mjs
+      - name: Download public official sample for isolated model test
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --max-time 60 https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/thumbs_up.jpg -o "$RUNNER_TEMP/hand-fixture.jpg"
+          sha256sum "$RUNNER_TEMP/hand-fixture.jpg"
+          echo "HAND_FIXTURE_PATH=$RUNNER_TEMP/hand-fixture.jpg" >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium
+      - run: npx vite build --config tests/hand-runtime/vite.config.js
+      - run: npx playwright test --config playwright.hand.config.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hand-runtime-numeric-evidence
+          path: |
+            hand-runtime-evidence/*.json
+            public/models/hand_landmarker.provenance.txt
+          if-no-files-found: warn
+          retention-days: 7
