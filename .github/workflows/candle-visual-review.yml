@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - integration/candle-free-practice-20261121
+      - integration/candle-v2-review-20261124
     paths:
       - 'src/render/**'
       - 'tests/candle-render.test.js'
@@ -32,7 +33,7 @@ jobs:
         run: npm run build
       - name: Chromium
         run: npx playwright install --with-deps chromium
-      - name: Capture synthetic 360/390/1366/1440 and browser stats
+      - name: Capture 360/390/1366/1440, lifecycle screenshots and browser stats
         run: npx playwright test --project=candle-visual-chromium
       - name: Upload OGON screenshots, diagnostics and traces
         if: always()
