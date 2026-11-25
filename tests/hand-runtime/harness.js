@@ -1,4 +1,5 @@
 import {HandForwardAnalyzer} from '../../src/vision/hand-forward-analyzer.js';
+import {HandForwardAnalyzer as BaselineAnalyzer} from '../fixtures/hand-v2-baseline.js';
 import {FreePracticeEngine} from '../../src/features/free-practice.js';
 
 function request(worker,message,transfer=[]){
@@ -30,6 +31,7 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   worker.addEventListener('message',({data})=>{if(data.type==='egress-blocked')privacyAttempts.push({origin:data.origin,phase:data.phase});});
   const engine=new FreePracticeEngine({analyzer:new HandForwardAnalyzer({mirrorX:false})});
   engine.start();
+  const baseline=new BaselineAnalyzer({mirrorX:false});
   let clock=0;
   const rows=[];
   let finalDelegate=null;
@@ -61,6 +63,7 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
       finalDelegate=data.delegate??finalDelegate;
       const fps=wall?arrivals.length:30;
       const result=engine.onFrame({...data,fps});
+      const old=baseline.analyze({...data,fps});
       rows.push({
         label,clock:stamp,landmarkCount:data.hands?.[0]?.length??0,handCount:data.hands?.length??0,
         clockMode:wall?'wall':'simulated',captureDeltaMs,observedFps:wall?fps:null,
@@ -69,6 +72,9 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
         finite:(data.hands??[]).every(hand=>hand.every(p=>[p.x,p.y,p.z].every(Number.isFinite))),
         inferenceMs:data.inferenceMs,workerRoundTripMs:after-before,
         quality:result.analysis.quality.ok,preview:!!result.analysis.previewMotion,confirmed:!!result.strike,
+        baselinePreview:!!old.previewMotion,baselineConfirmed:!!old.strike,
+        reason:result.analysis.quality.reasons[0]??null,phase:result.analysis.metrics?.gesturePhase??null,
+        previewTilt:engine.previewTilt,
       });
       engine.tick(wall&&captureDeltaMs!==null?Math.min(.1,captureDeltaMs/1000):.033);
       if(!wall)clock+=33;
@@ -77,7 +83,7 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('transformed-photo',scale);
     for(let i=0;i<8;i++)await frame('blank',1,true);
     // Independent phase using actual elapsed timestamps and measured result cadence.
-    engine.pause();engine.resume();
+    engine.pause();engine.resume();baseline.resetMotionState();
     wallBase=clock;wallEpoch=performance.now();lastCapture=null;arrivals=[];
     for(let i=0;i<20;i++)await frame('cadence-static',.72,false,true);
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('cadence-transformed-photo',scale,false,true);

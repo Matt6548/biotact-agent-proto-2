@@ -8,6 +8,8 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const within = (n, lo, hi) => Number.isFinite(n) && n >= lo && n <= hi;
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const MAX_GAP_MS = 180;
+// A bounded timing allowance compensates for sparse samples, not slow motion.
+const windowMs = cadence => clamp(650 + 5 * Math.max(0,cadence-33),650,1250);
 
 function handGeometry(points) {
   if (!Array.isArray(points) || points.length !== 21 || points.some((p) =>
@@ -42,6 +44,7 @@ export class HandForwardAnalyzer {
     this.lastStrikeAt = -Infinity;
     this.maxLateral = 0;
     this.peakCenter = null;
+    this.cadenceMs = 33;
   }
   reject(reason) {
     const lastStrikeAt = this.lastStrikeAt;
@@ -61,17 +64,21 @@ export class HandForwardAnalyzer {
     const geom = handGeometry(hands[0]);
     if (!geom) return this.reject('hand-partly-hidden');
     if (!Number.isFinite(timestampMs)) return this.reject('invalid-timestamp');
-    if (Number.isFinite(fps) && fps < 10) return this.reject('low-tracking-fps');
+    if (Number.isFinite(fps) && fps < 7) return this.reject('low-tracking-fps');
     if (!this.prev) {
       this.prev = {...geom,t:timestampMs};
       return {quality:{ok:true,reasons:[]},strike:null,metrics:{relativeScale:1},trackingPrimed:true};
     }
     const dt = timestampMs-this.prev.t;
     if (dt <= 0 || dt > MAX_GAP_MS) return this.reject('tracking-gap');
+    this.cadenceMs = .65*this.cadenceMs+.35*dt;
     const ratio = geom.scale/this.prev.scale;
+    // Bound relative jumps in log space, increasing allowance only for longer
+    // valid intervals. A missing interval is never interpolated.
+    const maxLogJump = clamp(Math.log(1.28)+2.0*Math.max(0,dt-33)/1000,Math.log(1.28),.48);
     const shapeDelta = Math.abs(Math.log((geom.width/this.prev.width)/(geom.height/this.prev.height)));
     const centerJump = dist(geom.center,this.prev.center);
-    if (!within(ratio,.78,1.28) || shapeDelta > .16 || centerJump > .13)
+    if (Math.abs(Math.log(ratio)) > maxLogJump || shapeDelta > .16 || centerJump > .13)
       return this.reject('hand-shape-or-position-jump');
     // Two stable axes must expand together: sideways waves and palm rotation
     // must not be mistaken for a fist moving toward the lens.
@@ -84,10 +91,13 @@ export class HandForwardAnalyzer {
     this.prev = {...geom,t:timestampMs};
     let strike = null;
     if (this.phase === 'idle') {
-      if (rising) {
+      if (rising && timestampMs-this.lastStrikeAt >= 450) {
         if (this.riseFrames === 0) this.riseBase = previous;
         this.riseFrames++;
-        if (this.riseFrames >= 2 && timestampMs-this.lastStrikeAt >= 450) {
+        // At sparse cadence, one substantial coherent approach can prime a
+        // visual cue. Confirmation still requires TWO observed retreat steps.
+        const sparseRise = dt >= 60 && ratio >= 1.23 && widthRise >= 1.15 && heightRise >= 1.15;
+        if (this.riseFrames >= 2 || sparseRise) {
           this.phase = 'out';
           this.startScale = this.riseBase.scale;
           this.startCenter = this.riseBase.center;
@@ -107,7 +117,8 @@ export class HandForwardAnalyzer {
         this.peakCenter = geom.center;
       }
       this.maxLateral = Math.max(this.maxLateral,dist(geom.center,this.startCenter));
-      if (timestampMs-this.startedAt > 650 || this.maxLateral > .145) {
+      const shapeDrift = Math.abs(Math.log((geom.width/this.riseBase.width)/(geom.height/this.riseBase.height)));
+      if (timestampMs-this.startedAt > windowMs(this.cadenceMs) || this.maxLateral > .145 || shapeDrift > .24) {
         this.phase = 'recovery';
       } else if (retreating) {
         this.retractFrames++;
@@ -150,6 +161,7 @@ export class HandForwardAnalyzer {
     const previewMotion = this.phase === 'out' && rising && expansion >= 1.12 &&
       this.maxLateral <= .10 && !strike ? {
         strength:clamp((expansion-1)*1.3,0,.55),
+        intervalMs:dt,
         direction:this.visualDirection(geom.center),
       } : null;
     return {quality:{ok:true,reasons:[]},strike,previewMotion,metrics:{

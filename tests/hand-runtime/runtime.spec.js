@@ -53,6 +53,12 @@ for(const delegate of ['auto','CPU']){
       cadenceStaticConfirmed:cadenceStatic.filter(r=>r.confirmed).length,
       cadenceMotionPreviews:cadenceMotion.filter(r=>r.preview).length,
       cadenceMotionConfirmed:cadenceMotion.filter(r=>r.confirmed).length,
+      baselineCadenceMotionPreviews:cadenceMotion.filter(r=>r.baselinePreview).length,
+      baselineCadenceMotionConfirmed:cadenceMotion.filter(r=>r.baselineConfirmed).length,
+      cadencePreviewAtMs:cadenceMotion.find(r=>r.preview)?.clock??null,
+      cadenceConfirmedAtMs:cadenceMotion.find(r=>r.confirmed)?.clock??null,
+      cadenceMotionStartMs:cadenceMotion[0]?.clock??null,
+      cadenceReasons:cadenceMotion.reduce((out,r)=>{if(r.reason)out[r.reason]=(out[r.reason]??0)+1;return out;},{}),
       cadenceObservedFpsMedian:pct(cadence.slice(12).map(r=>r.observedFps).sort((a,b)=>a-b),.5),
       cadenceCaptureDeltaP90Ms:pct(cadence.slice(1).map(r=>r.captureDeltaMs).sort((a,b)=>a-b),.9),
       cadenceRoundTripP90Ms:pct(cadence.map(r=>r.workerRoundTripMs).sort((a,b)=>a-b),.9),
@@ -91,6 +97,9 @@ for(const delegate of ['auto','CPU']){
     expect(report.staticConfirmed).toBe(0);
     expect(report.cadenceStaticPreviews).toBe(0);
     expect(report.cadenceStaticConfirmed).toBe(0);
+    expect(report.cadenceMotionConfirmed).toBeLessThanOrEqual(1);
+    expect(report.cadenceMotionConfirmed).toBeGreaterThanOrEqual(report.baselineCadenceMotionConfirmed);
+    if(report.cadenceMotionConfirmed)expect(report.cadencePreviewAtMs).toBeLessThan(report.cadenceConfirmedAtMs);
     expect(report.transformedPhotoPreviewFrames).toBeGreaterThan(0);
     expect(report.transformedPhotoConfirmed).toBe(1);
     expect(report.simulatedPreviewFirstMs).toBeLessThan(report.simulatedConfirmedFirstMs);
