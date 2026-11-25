@@ -77,7 +77,7 @@ export class FreePracticeEngine {
   tick(dtSeconds) {
     if (this.state === "practicing" || this.state === "framing") {
       this.flame.step(dtSeconds);
-      const dt = Number.isFinite(dtSeconds) ? clamp(dtSeconds,0,.1) : 0;
+      const dt = Number.isFinite(dtSeconds) ? clamp(dtSeconds,0,1) : 0;
       // Release in elapsed time, not frame count; remain visible between
       // sparse samples without accumulating a physical oscillator impulse.
       this.previewTilt *= Math.exp(-dt*7.5);

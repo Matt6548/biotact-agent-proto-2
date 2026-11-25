@@ -45,10 +45,13 @@ export class HandForwardAnalyzer {
     this.maxLateral = 0;
     this.peakCenter = null;
     this.cadenceMs = 33;
+    this.lastFrameAt = null;
   }
   reject(reason) {
     const lastStrikeAt = this.lastStrikeAt;
+    const lastFrameAt = this.lastFrameAt;
     this.resetMotionState();
+    this.lastFrameAt = lastFrameAt;
     this.lastStrikeAt = lastStrikeAt; // a lost hand must not bypass cooldown
     return {quality:{ok:false,reasons:[reason]}, strike:null, previewMotion:null, metrics:null, trackingReset:true};
   }
@@ -59,11 +62,13 @@ export class HandForwardAnalyzer {
     return Math.abs(dx) >= .025 ? Math.sign(dx) : (x < .5 ? -1 : 1);
   }
   analyze({hands, timestampMs, fps} = {}) {
+    if (!Number.isFinite(timestampMs)) return this.reject('invalid-timestamp');
+    if (this.lastFrameAt!==null && timestampMs<=this.lastFrameAt) return this.reject('tracking-gap');
+    this.lastFrameAt=timestampMs;
     // Two hands can belong to separate people, and the API has no identity guarantee.
     if (!Array.isArray(hands) || hands.length !== 1) return this.reject(hands?.length > 1 ? 'ambiguous-hands' : 'hand-not-visible');
     const geom = handGeometry(hands[0]);
     if (!geom) return this.reject('hand-partly-hidden');
-    if (!Number.isFinite(timestampMs)) return this.reject('invalid-timestamp');
     if (Number.isFinite(fps) && fps < 7) return this.reject('low-tracking-fps');
     if (!this.prev) {
       this.prev = {...geom,t:timestampMs};

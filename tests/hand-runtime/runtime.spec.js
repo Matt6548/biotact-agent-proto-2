@@ -36,6 +36,18 @@ for(const delegate of ['auto','CPU']){
       if(samples.length)byDelegate[d]={samples:samples.length,medianMs:samples[Math.ceil(samples.length*.5)-1],p90Ms:samples[Math.ceil(samples.length*.9)-1]};
     }
     const pct=(arr,p)=>arr[Math.min(arr.length-1,Math.ceil(arr.length*p)-1)];
+    const paced=[7,10,15].map(target=>{
+      const motion=result.rows.filter(r=>r.label==='paced-'+target+'-motion');
+      const stationary=result.rows.filter(r=>r.label==='paced-'+target+'-static');
+      if(!motion.length)return null;
+      return {targetFps:target,observedMedianFps:pct(motion.map(r=>r.observedFps).sort((a,b)=>a-b),.5),frames:motion.length,
+        actualCaptureDeltaP90Ms:pct(motion.map(r=>r.captureDeltaMs).filter(Number.isFinite).sort((a,b)=>a-b),.9),
+        oldEvents:motion.filter(r=>r.baselineConfirmed).length,newEvents:motion.filter(r=>r.confirmed).length,
+        newPreviews:motion.filter(r=>r.preview).length,staticEvents:stationary.filter(r=>r.confirmed).length,
+        staticPreviews:stationary.filter(r=>r.preview).length,qualityFrames:motion.filter(r=>r.quality).length,
+        firstPreviewOffsetMs:motion.some(r=>r.preview)?motion.find(r=>r.preview).clock-motion[0].clock:null,
+        confirmationOffsetMs:motion.some(r=>r.confirmed)?motion.find(r=>r.confirmed).clock-motion[0].clock:null};
+    }).filter(Boolean);
     const report={
       source:'https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/thumbs_up.jpg',
       fixtureSHA256:crypto.createHash('sha256').update(bytes).digest('hex'),
@@ -64,7 +76,7 @@ for(const delegate of ['auto','CPU']){
       cadenceRoundTripP90Ms:pct(cadence.map(r=>r.workerRoundTripMs).sort((a,b)=>a-b),.9),
       simulatedPreviewFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.preview)?.clock??null,
       simulatedConfirmedFirstMs:result.rows.find(r=>r.label==='transformed-photo'&&r.confirmed)?.clock??null,
-      outgoing,privacyAttempts:result.privacyAttempts,idleMs:result.idleMs,disposed:result.disposed,rows:result.rows,
+      paced, outgoing,privacyAttempts:result.privacyAttempts,idleMs:result.idleMs,disposed:result.disposed,rows:result.rows,
       limitations:'Actual model on photographed hand pixels. First phase uses simulated timestamps; second uses real elapsed time and inference cadence, but still a transformed photo, not a live person/camera or device FPS.',
     };
     fs.mkdirSync('hand-runtime-evidence',{recursive:true});
@@ -107,7 +119,15 @@ for(const delegate of ['auto','CPU']){
     expect(outgoing).toEqual([]);
     expect(result.privacyAttempts).toEqual([]);
     expect(result.disposed).toBe(true);
-    if(delegate==='CPU')expect(result.idleMs).toBeGreaterThanOrEqual(65000);
+    if(delegate==='CPU'){
+      expect(result.idleMs).toBeGreaterThanOrEqual(65000);
+      expect(paced).toHaveLength(3);
+      for(const row of paced){
+        expect(row.staticEvents).toBe(0);expect(row.staticPreviews).toBe(0);
+        expect(row.newEvents).toBeLessThanOrEqual(1);
+        if(row.newEvents)expect(row.firstPreviewOffsetMs).toBeLessThan(row.confirmationOffsetMs);
+      }
+    }
   });
 }
 

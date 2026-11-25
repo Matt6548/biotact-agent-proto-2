@@ -47,7 +47,7 @@ test('same trajectories at 7/10/12/15 FPS, phase offsets and jitter: paired base
   }
   report.push({fps,cases,baselineConfirmed:old,newConfirmed:updated,missed:miss,medianLeadMs:firstLead.sort((a,b)=>a-b)[Math.floor(firstLead.length/2)]??null});
   assert.ok(updated>=old,'no regression on this controlled rate sweep');
-  assert.ok(updated>=12,'at least half of sampled trajectories must be observable and confirmed');
+  assert.equal(updated,cases,'retain the initial measured 24/24 on this fixed controlled sweep');
  }
  console.log('HAND_CADENCE_SWEEP '+JSON.stringify(report));
 });
@@ -66,15 +66,12 @@ test('negative matrix: noise, lateral drift, rotation, slow approach, held appro
    ['rotation',i=>frame(i*dt,1,{fps,width:1+.20*Math.sin(i*.25),height:1-.18*Math.sin(i*.25)})],
    ['slow',i=>frame(i*dt,1+.22*Math.sin(i*dt/2500),{fps})],
    ['hold',i=>frame(i*dt,1+Math.min(.45,Math.max(0,(i-4)*.12)),{fps})],
-   ['loss',i=>frame(i*dt,pulse(i*dt,400,700),{fps,missing:i===5||i===6})],
+   ['loss',i=>frame(i*dt,pulse(i*dt,400,700),{fps,missing:i*dt>=450&&i*dt<=1050})],
    ['two hands',i=>{const f=frame(i*dt,pulse(i*dt,400,700),{fps});f.hands.push(f.hands[0]);return f;}],
   ];
   for(const [name,make] of cases){
    const frames=Array.from({length:40},(_,i)=>make(i));
    const n=replay(HandForwardAnalyzer,frames);
-   // Loss case can be fully visible at 15 FPS after reacquisition, so only
-   // assert strict negatives on frames with no complete observable pulse.
-   if(name==='loss')continue;
    counts.push({fps,name,events:n.count,previews:n.previews});
    assert.equal(n.count,0,name+' @'+fps);
    if(['noise','lateral','rotation','slow','two hands'].includes(name))assert.equal(n.previews,0,name);
@@ -97,4 +94,25 @@ test('preview follows elapsed time, never extinguishes, fades after lost input a
  const start=Math.abs(e.previewTilt);
  e.tick(.1);assert.ok(Math.abs(e.previewTilt)<start);
  const r=e.onFrame(frame(t,1,{fps:7,missing:true}));assert.equal(r.flame.tilt,0);assert.equal(e.strikeCount,0);
+});
+
+test('loss preserves monotonic timestamp boundary; explicit session reset permits new clock',()=>{
+ const a=new HandForwardAnalyzer();
+ a.analyze(frame(100,1));a.analyze(frame(200,1.2));
+ a.analyze(frame(300,1.4,{missing:true}));
+ assert.deepEqual(a.analyze(frame(250,1.1)).quality.reasons,['tracking-gap']);
+ assert.equal(a.analyze(frame(301,1.1)).trackingPrimed,true);
+ a.resetMotionState();
+ assert.equal(a.analyze(frame(0,1)).trackingPrimed,true);
+});
+test('one-second render stall cannot preserve stale preview',()=>{
+ const e=new FreePracticeEngine({analyzer:new HandForwardAnalyzer()});e.start();
+ e.onFrame(frame(0,1,{fps:7}));e.onFrame(frame(140,1.3,{fps:7}));
+ assert.ok(Math.abs(e.previewTilt)>0);
+ e.tick(1);assert.equal(e.previewTilt,0);
+});
+test('ultrafast unobserved pulse and jittered loss never synthesize a confirmed event',()=>{
+ const a=new HandForwardAnalyzer();
+ const input=[frame(0,1,{fps:7}),frame(143,1,{fps:7}),frame(286,1.36,{fps:7}),frame(430,1,{fps:7}),frame(600,1,{fps:7,missing:true}),frame(743,1,{fps:7})];
+ for(const f of input)assert.equal(a.analyze(f).strike,null);
 });

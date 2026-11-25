@@ -40,8 +40,9 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   try{
     const init=await request(worker,{type:'init',delegate});
     finalDelegate=init.delegate;
-    async function frame(label,scale,blank=false,wall=false){
-      if(wall&&lastCapture!==null)await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-lastCapture))));
+    async function frame(label,scale,blank=false,wall=false,period=33){
+      if(wall&&lastCapture!==null)await new Promise(r=>setTimeout(r,Math.max(0,period-(performance.now()-lastCapture))));
+      if(typeof scale==='function')scale=scale(performance.now());
       ctx.fillStyle='#202020';ctx.fillRect(0,0,640,480);
       if(!blank){
         const fit=Math.min(640/image.width,480/image.height)*scale;
@@ -88,6 +89,22 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
     for(let i=0;i<20;i++)await frame('cadence-static',.72,false,true);
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('cadence-transformed-photo',scale,false,true);
     for(let i=0;i<5;i++)await frame('cadence-blank',1,true,true);
+    // Time-defined pulse: physical duration in the fixture does not stretch
+    // when inference gets slower. Target rates are caps, not achieved FPS.
+    if(delegate==='CPU')for(const target of [7,10,15]){
+      engine.pause();engine.resume();baseline.resetMotionState();arrivals=[];
+      const label='paced-'+target,period=1000/target;
+      const warm=performance.now();
+      while(performance.now()-warm<1300)await frame(label+'-static',.72,false,true,period);
+      const start=performance.now()+period;
+      const scale=now=>{
+        const u=(now-start)/820;
+        if(u<=0||u>=1)return .72;
+        return .72*Math.exp(Math.log(1.48)*(u<.42?u/.42:(1-u)/.58));
+      };
+      while(performance.now()-start<1300)await frame(label+'-motion',scale,false,true,period);
+      for(let i=0;i<3;i++)await frame(label+'-blank',1,true,true,period);
+    }
     // Exercise the SDK's periodic timer and close path, not just brief inference.
     const idleMs=delegate==='CPU'?65000:500;
     await new Promise(r=>setTimeout(r,idleMs));
