@@ -77,8 +77,10 @@ export class FreePracticeEngine {
   tick(dtSeconds) {
     if (this.state === "practicing" || this.state === "framing") {
       this.flame.step(dtSeconds);
-      const dt = Number.isFinite(dtSeconds) ? clamp(dtSeconds,0,.1) : 0;
-      this.previewTilt *= Math.exp(-dt*10);
+      const dt = Number.isFinite(dtSeconds) ? clamp(dtSeconds,0,1) : 0;
+      // Release in elapsed time, not frame count; remain visible between
+      // sparse samples without accumulating a physical oscillator impulse.
+      this.previewTilt *= Math.exp(-dt*7.5);
       if (Math.abs(this.previewTilt)<.001) this.previewTilt=0;
     }
     return this.visualFlame();
@@ -107,7 +109,9 @@ export class FreePracticeEngine {
     if (!analysis.quality.ok || strike || this.flame.snapshot().extinguished) this.previewTilt=0;
     else if (preview && Number.isFinite(preview.strength) && Number.isFinite(preview.direction)) {
       const target=clamp(preview.strength,0,.55)*Math.sign(preview.direction)*.35;
-      this.previewTilt=clamp(.45*this.previewTilt+.55*target,-.193,.193);
+      const interval = Number.isFinite(preview.intervalMs) ? clamp(preview.intervalMs,0,180) : 33;
+      const alpha = 1-Math.exp(-interval/45);
+      this.previewTilt=clamp((1-alpha)*this.previewTilt+alpha*target,-.193,.193);
     }
     let response = null;
     if (strike) {
