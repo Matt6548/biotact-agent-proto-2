@@ -1,11 +1,12 @@
 export class PoseTracker {
-  constructor({ video, onResult, onStatus, workerFactory = null }) {
+  constructor({ video, onResult, onStatus, workerFactory = null, workerInit = {} }) {
     this.video = video;
     this.onResult = onResult;
     this.onStatus = onStatus;
     // Keep the existing Pose worker as the default. An opt-in hand worker can
     // reuse the same camera lifecycle without opening a second stream.
     this.workerFactory = workerFactory ?? (() => new Worker(new URL("./pose-worker.js", import.meta.url), { type: "module" }));
+    this.workerInit = workerInit;
     this.worker = null;
     this.stream = null;
     this.running = false;
@@ -57,11 +58,14 @@ export class PoseTracker {
 
     try {
       this.worker = this.workerFactory();
-      this.worker.onmessage = (event) => this.handleWorkerMessage(event.data);
-      this.worker.onerror = (event) => {
-        this.onStatus?.({ state: "error", message: event.message || "Pose worker failed." });
+      const worker=this.worker;
+      this.worker.onmessage = (event) => {
+        if (generation===this.generation && this.worker===worker) this.handleWorkerMessage(event.data);
       };
-      this.worker.postMessage({ type: "init" });
+      this.worker.onerror = (event) => {
+        if (generation===this.generation && this.worker===worker) this.onStatus?.({ state: "error", message: event.message || "Vision worker failed." });
+      };
+      this.worker.postMessage({ ...this.workerInit, type: "init" });
     } catch (error) {
       this.stop();
       throw error;
@@ -76,10 +80,13 @@ export class PoseTracker {
     this.running = false;
     this.worker?.terminate();
     this.worker = null;
-    this.stream?.getTracks().forEach((track) => track.stop());
+    const stream=this.stream;
+    stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
-    if (this.video) this.video.srcObject = null;
+    // A late stop from an older controller must not detach a replacement stream.
+    if (stream && this.video?.srcObject===stream) this.video.srcObject = null;
     this.frameBusy = false;
+    this.lastSentAt = 0;
     this.frameTimes = [];
     this.busySkipTimes = [];
     this.delegate = null;
@@ -107,6 +114,15 @@ export class PoseTracker {
 
     if (data.type === "result") {
       this.frameBusy = false;
+      if(data.delegateChanged&&data.delegate==="CPU"){
+        this.delegate="CPU";
+        this.frameTimes=[];
+        this.busySkipTimes=[];
+        // Empty transition frame resets the hand analyzer in onResult below.
+        this.onStatus?.({state:"ready",mode:"hands",delegate:"CPU",
+          message:"Hand model ready · CPU",fallback:"slow-gpu",
+          initMs:Number.isFinite(data.switchInitMs)?data.switchInitMs:null});
+      }
       const now = performance.now();
       this.frameTimes.push(now);
       this.pruneWindow(this.frameTimes, now);
@@ -117,6 +133,7 @@ export class PoseTracker {
         fps: this.frameTimes.length,
         diagnostics: {
           inferenceMs: Number.isFinite(data.inferenceMs) ? data.inferenceMs : null,
+          frameToResultMs: Number.isFinite(data.timestampMs) ? Math.max(0,now-data.timestampMs) : null,
           busySkipsPerSecond: this.busySkipTimes.length,
           delegate: this.delegate,
         },
@@ -138,9 +155,10 @@ export class PoseTracker {
 
   scheduleFrame() {
     if (!this.running) return;
+    const generation=this.generation;
 
     const callback = async () => {
-      if (!this.running) return;
+      if (!this.running || generation!==this.generation) return;
       const now = performance.now();
       const videoReady = this.video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
       const due = now - this.lastSentAt >= this.minFrameIntervalMs;
@@ -154,19 +172,20 @@ export class PoseTracker {
           this.frameBusy = true;
           try {
             const bitmap = await createImageBitmap(this.video);
-            if (!this.running || !this.worker) {
+            if (!this.running || generation!==this.generation || !this.worker) {
               bitmap.close?.();
               return;
             }
             this.worker.postMessage({ type: "frame", bitmap, timestampMs: now }, [bitmap]);
           } catch (error) {
+            if (generation!==this.generation) return;
             this.frameBusy = false;
             if (this.running) this.onStatus?.({ state: "error", message: String(error?.message || error) });
           }
         }
       }
 
-      this.scheduleFrame();
+      if (generation===this.generation) this.scheduleFrame();
     };
 
     if ("requestVideoFrameCallback" in HTMLVideoElement.prototype) {

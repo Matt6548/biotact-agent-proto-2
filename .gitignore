@@ -15,3 +15,6 @@ public/models/
 .netlify/
 .env.local
 .env.*.local
+
+.hand-runtime-dist/
+hand-runtime-evidence/

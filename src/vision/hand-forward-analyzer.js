@@ -41,10 +41,19 @@ export class HandForwardAnalyzer {
     this.retractFrames = 0;
     this.lastStrikeAt = -Infinity;
     this.maxLateral = 0;
+    this.peakCenter = null;
   }
   reject(reason) {
+    const lastStrikeAt = this.lastStrikeAt;
     this.resetMotionState();
-    return {quality:{ok:false,reasons:[reason]}, strike:null, metrics:null, trackingReset:true};
+    this.lastStrikeAt = lastStrikeAt; // a lost hand must not bypass cooldown
+    return {quality:{ok:false,reasons:[reason]}, strike:null, previewMotion:null, metrics:null, trackingReset:true};
+  }
+  visualDirection(center) {
+    const x = this.mirrorX ? 1-center.x : center.x;
+    const origin = this.mirrorX ? 1-this.startCenter.x : this.startCenter.x;
+    const dx = x-origin;
+    return Math.abs(dx) >= .025 ? Math.sign(dx) : (x < .5 ? -1 : 1);
   }
   analyze({hands, timestampMs, fps} = {}) {
     // Two hands can belong to separate people, and the API has no identity guarantee.
@@ -84,14 +93,19 @@ export class HandForwardAnalyzer {
           this.startCenter = this.riseBase.center;
           this.startedAt = this.riseBase.t;
           this.peakScale = geom.scale;
-          this.maxLateral = 0;
+          this.peakCenter = geom.center;
+          this.maxLateral = dist(geom.center,this.startCenter);
+          this.retractFrames = 0;
         }
       } else {
         this.riseFrames = 0;
         this.riseBase = null;
       }
     } else if (this.phase === 'out') {
-      this.peakScale = Math.max(this.peakScale,geom.scale);
+      if (geom.scale > this.peakScale) {
+        this.peakScale = geom.scale;
+        this.peakCenter = geom.center;
+      }
       this.maxLateral = Math.max(this.maxLateral,dist(geom.center,this.startCenter));
       if (timestampMs-this.startedAt > 650 || this.maxLateral > .145) {
         this.phase = 'recovery';
@@ -104,11 +118,8 @@ export class HandForwardAnalyzer {
           // A pulse in size, on both axes, then a confirmed reversal.
           if (expansion >= 1.23 && shrink <= .94 && durationMs >= 115 &&
               this.maxLateral <= .145 && timestampMs-this.lastStrikeAt >= 450) {
-            const startScreenX = this.mirrorX ? 1-this.startCenter.x : this.startCenter.x;
-            const endScreenX = this.mirrorX ? 1-geom.center.x : geom.center.x;
-            const movementX = endScreenX-startScreenX;
-            const direction = Math.abs(movementX) >= .025 ? Math.sign(movementX) :
-              (endScreenX < .5 ? -1 : 1);
+            // Direction describes the outward trajectory, not the returning hand.
+            const direction = this.visualDirection(this.peakCenter);
             strike = {
               t:timestampMs,hand:direction<0?'left':'right',visualDirection:direction,
               // Dimensionless proxy scaled for existing FlameModel, NOT measured speed.
@@ -124,8 +135,8 @@ export class HandForwardAnalyzer {
           }
           this.phase='recovery';
         }
-      } else if (rising) {
-        this.retractFrames=0;
+      } else {
+        this.retractFrames=0; // confirmation requires consecutive retreat samples
       }
     } else if (this.phase === 'recovery') {
       if (geom.scale <= this.startScale*1.085) {
@@ -134,7 +145,14 @@ export class HandForwardAnalyzer {
         this.riseBase=null;
       }
     }
-    return {quality:{ok:true,reasons:[]},strike,metrics:{
+    // Early, reversible visual-only cue. It is not a strike or a physical impulse.
+    const expansion = this.startScale ? geom.scale/this.startScale : 1;
+    const previewMotion = this.phase === 'out' && rising && expansion >= 1.12 &&
+      this.maxLateral <= .10 && !strike ? {
+        strength:clamp((expansion-1)*1.3,0,.55),
+        direction:this.visualDirection(geom.center),
+      } : null;
+    return {quality:{ok:true,reasons:[]},strike,previewMotion,metrics:{
       relativeScale:clamp(geom.scale/Math.max(this.startScale||geom.scale,.0001),0,4),
       gesturePhase:this.phase,
     },trackingPrimed:false};
