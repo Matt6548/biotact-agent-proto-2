@@ -27,8 +27,8 @@ jobs:
           set -o pipefail
           mkdir -p hand-runtime-evidence
           npm test | tee hand-runtime-evidence/node-tests.log
-      - name: Default app build
-        id: default_build (Pose path, no hand model in default dist)
+      - name: Default app build (Pose path, no hand model in default dist)
+        id: default_build
         run: npm run build
       - run: node scripts/prepare-hand-landmarker-assets.mjs
       - name: Download public official sample for isolated model test
