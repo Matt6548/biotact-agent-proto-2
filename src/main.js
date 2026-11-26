@@ -14,6 +14,10 @@ import { MotionTraceRecorder, replayMotionTrace, validateMotionTrace } from "./c
 import { CandleTrainingSession } from "./features/candle-training.js";
 import { LiveTrainingAnalyzer } from "./features/live-training.js";
 import { FreePracticeCameraController } from "./features/free-practice.js";
+import { createHandForwardPractice } from "./vision/hand-practice.js";
+
+// Explicit build-time test gate; URL parameters cannot activate Hand mode.
+const handFieldMode=import.meta.env.VITE_CANDLE_HAND_FIELD==="1";
 import { createCandleTarget } from "./render/candle-target.js";
 
 const session=new CandleTrainingSession();
@@ -113,7 +117,7 @@ root.innerHTML=`
       <div class="camera-head"><h2>Настройка движения</h2><span class="status-pill" id="camera-status" data-state="idle">Камера выключена</span><button class="text-button back-to-candle" id="back-to-candle" type="button">К свече ↑</button></div>
       <div class="camera-stage" id="camera-stage">
         <video id="camera" playsinline muted></video><canvas id="pose-overlay"></canvas>
-        <div class="frame-guide" aria-hidden="true"><span>Держи плечи и корпус в кадре</span></div>
+        <div class="frame-guide" aria-hidden="true"><span>${handFieldMode?"Держи одну кисть в кадре":"Держи плечи и корпус в кадре"}</span></div>
         <div id="mini-target-canvas" class="mini-target" aria-hidden="true"></div>
         <div class="camera-empty" id="camera-empty"><strong>Камера пока выключена</strong><span>Включится только после нажатия «Начать упражнение».</span></div>
       </div>
@@ -198,6 +202,7 @@ const chapterLabel=root.querySelector("#chapter-label");
 const chapterMission=root.querySelector("#chapter-mission");
 const chapterBrief=root.querySelector("#chapter-brief");
 lab.dataset.live="off";
+lab.dataset.trackingMode=handFieldMode?"hand-field":"pose";
 const mobileTrainingQuery=window.matchMedia("(max-width: 600px)");
 const candleRenderer=createCandleTarget(root.querySelector("#target-canvas"),{
   pixelRatio:mobileTrainingQuery.matches?1.4:2,
@@ -222,11 +227,20 @@ let importedTrace=null,replayingTrace=false,lastFieldRoundEvidence=null;
 let localPlayer=readLocalPlayer();
 let relightTimer=null,hitTimer=null,attempts=readHistory(),cameraStarted=false,cameraBusy=false,poseReady=false,calibrated=false,calibrating=false,roundLevel=null,lastRoundOutcome=null,trainingPaused=false;
 const practiceStatus=root.querySelector("#practice-status");
-const freePractice=new FreePracticeCameraController({
-  video,
-  onUpdate:updateFreePracticeLive,
-  onStatus:setCameraStatus,
-});
+const practiceOptions={video,onUpdate:updateFreePracticeLive,onStatus:setCameraStatus};
+const freePractice=handFieldMode?createHandForwardPractice({...practiceOptions,delegate:"CPU"}):new FreePracticeCameraController(practiceOptions);
+if(handFieldMode){
+  // Pose trace format does not support hands. Keep only aggregate device report.
+  for(const id of ["trace-toggle","trace-export","trace-import","trace-replay","trace-clear","field-pack-export"]){
+    const el=root.querySelector("#"+id);
+    el.disabled=true;
+    (id==="trace-import"?el.closest("label"):el).hidden=true;
+  }
+  root.querySelector(".field-test-body > div:first-child").hidden=true;
+  root.querySelector(".field-pack-note").hidden=true;
+  traceStatus.textContent="Тест кисти · только общие показатели устройства, без записи координат.";
+  practiceStatus.textContent="Тест кисти · готово к началу";
+}
 let practiceTickTimer=null;
 
 function stopPracticeTick(){
@@ -347,12 +361,12 @@ function updateLevel(){
 function updatePrimary(){
   primaryAction.disabled=cameraBusy;
   primaryAction.textContent=cameraBusy?"Включаем камеру…":!cameraStarted?"Начать упражнение":trainingPaused?"Продолжить":"Пауза";
-  practiceStatus.textContent=!cameraStarted?"Готово к началу":trainingPaused?"Пауза · камера выключена":!poseReady?"Подключаем отслеживание движения":freePractice.snapshot().state==="framing"?"Поправь положение":"Свободная тренировка";
+  practiceStatus.textContent=!cameraStarted?"Готово к началу":trainingPaused?"Пауза · камера выключена":!poseReady?"Подключаем отслеживание движения":freePractice.snapshot().state==="framing"?(handFieldMode?"Покажи одну кисть":"Поправь положение"):"Свободная тренировка";
 }
 function syncFieldPackButton(){
   const trace=traceRecorder.export();
   const report=deviceDiagnostics.report();
-  fieldPackExport.disabled=traceRecorder.active||trace.frameCount===0||report.status==="insufficient"||!lastFieldRoundEvidence;
+  fieldPackExport.disabled=handFieldMode||traceRecorder.active||trace.frameCount===0||report.status==="insufficient"||!lastFieldRoundEvidence;
 }
 
 function renderSessionReview(summary=trainingSessionReview.snapshot()){
@@ -448,7 +462,7 @@ function setCameraStatus({state,message,delegate}){
     modelBackendEl.textContent=delegate||"—";
     if(cameraStarted&&!calibrating){
       cameraCard.dataset.pose="missing";
-      setupState.textContent="Отслеживание готово · держи руки в кадре";
+      setupState.textContent=handFieldMode?"Отслеживание готово · покажи одну кисть":"Отслеживание готово · держи руки в кадре";
     }
     updatePrimary();
   }else if(state==="privacy-block"){
@@ -557,7 +571,7 @@ function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCoun
     deviceReportExport.disabled=report.status==="insufficient";
     syncFieldPackButton();
   }
-  if(traceRecorder.active){
+  if(!handFieldMode&&traceRecorder.active){
     traceRecorder.add(frame);
     traceStatus.textContent=`Recording · ${traceRecorder.frames.length} frames`;
     if(!traceRecorder.active){
@@ -566,29 +580,40 @@ function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCoun
       traceStatus.textContent=`Trace capped · ${traceRecorder.frames.length} frames`;
     }
   }
-  drawPose(frame.landmarks);
-  if(!analysis?.metrics){
-    cameraCard.dataset.pose="missing";
-    qualityEl.textContent="Человек не найден";
-    setupState.textContent="Встань перед камерой, чтобы были видны плечи и руки";
-    updatePrimary();
-    return;
+  if(handFieldMode){
+    // Hand analyzer has different metrics and no anatomical left/right label.
+    // Do not display Pose skeleton or retain hand coordinates.
+    drawPose(null);
+    fpsEl.textContent=Number.isFinite(frame.fps)?String(Math.round(frame.fps)):"—";
+    leftSpeedEl.textContent="—";
+    rightSpeedEl.textContent="—";
+    const ready=Boolean(analysis?.quality?.ok);
+    cameraCard.dataset.pose=ready?"ready":"adjust";
+    qualityEl.textContent=ready?"Кисть в кадре":"Нет уверенного отслеживания";
+    setupState.textContent=ready?"Всё готово · двигайся свободно":"Покажи одну кисть целиком";
+  }else{
+    drawPose(frame.landmarks);
+    if(!analysis?.metrics){
+      cameraCard.dataset.pose="missing";
+      qualityEl.textContent="Человек не найден";
+      setupState.textContent="Встань перед камерой, чтобы были видны плечи и руки";
+      updatePrimary();
+      return;
+    }
+    cameraCard.dataset.pose=state==="practicing"?"ready":"adjust";
+    fpsEl.textContent=String(Math.round(analysis.metrics.fps||0));
+    leftSpeedEl.textContent=Number.isFinite(analysis.metrics.leftWristSpeed)?`${analysis.metrics.leftWristSpeed.toFixed(1)} условн. ед./с`:"—";
+    rightSpeedEl.textContent=Number.isFinite(analysis.metrics.rightWristSpeed)?`${analysis.metrics.rightWristSpeed.toFixed(1)} условн. ед./с`:"—";
+    qualityEl.textContent=analysis.quality.ok?"В кадре":"Поправь положение";
+    setupState.textContent=state==="practicing"?"Всё готово · двигайся свободно":"Держи плечи, руки и корпус в кадре";
   }
-  cameraCard.dataset.pose=state==="practicing"?"ready":"adjust";
-  fpsEl.textContent=String(Math.round(analysis.metrics.fps||0));
-  leftSpeedEl.textContent=`${analysis.metrics.leftWristSpeed.toFixed(1)} условн. ед./с`;
-  rightSpeedEl.textContent=`${analysis.metrics.rightWristSpeed.toFixed(1)} условн. ед./с`;
-  qualityEl.textContent=analysis.quality.ok?"В кадре":"Поправь положение";
-  setupState.textContent=state==="practicing"
-    ?"Всё готово · двигайся свободно"
-    :"Держи плечи, руки и корпус в кадре";
   if(strike&&response){
     const hand=strike.hand==="left"?"Левая":"Правая";
     candleRenderer.setState(response.flame);
     candleRenderer.triggerImpulse(response.visualImpulse);
     flameState.textContent=response.flame.extinguished?"Пламя погасло":response.flame.instability>.65?"Пламя колеблется":"Пламя движется";
     score.textContent=response.visualImpulse.toFixed(2);
-    lastStrike.textContent=`${hand} рука · относительное движение`;
+    lastStrike.textContent=handFieldMode?"Приближение кисти · условный отклик":`${hand} рука · относительное движение`;
     roundCount.textContent=String(strikeCount);
     hitFeedback.textContent=response.flame.extinguished?"Пламя погасло":"Движение зафиксировано";
     hitFeedback.classList.remove("show");void hitFeedback.offsetWidth;hitFeedback.classList.add("show");
@@ -784,6 +809,7 @@ root.querySelector("#reset").addEventListener("click",()=>{clearTimeout(relightT
 root.querySelector("#clear-history").addEventListener("click",()=>{attempts=[];writeHistory();renderHistory();});
 
 traceToggle.addEventListener("click",()=>{
+  if(handFieldMode)return;
   if(traceRecorder.active){
     const trace=traceRecorder.stop();
     traceToggle.textContent="Start motion trace";
@@ -826,6 +852,7 @@ deviceReportExport.addEventListener("click",()=>{
 });
 
 traceExport.addEventListener("click",()=>{
+  if(handFieldMode)return;
   const trace=traceRecorder.export();
   if(!trace.frameCount){
     traceStatus.textContent="No trace to export.";
@@ -844,6 +871,7 @@ traceExport.addEventListener("click",()=>{
 });
 
 fieldPackExport.addEventListener("click",()=>{
+  if(handFieldMode)return;
   const built=buildFieldTestPack({
     motionTrace:traceRecorder.export(),
     deviceReport:deviceDiagnostics.report(),
@@ -867,6 +895,7 @@ fieldPackExport.addEventListener("click",()=>{
 });
 
 traceImport.addEventListener("change",async()=>{
+  if(handFieldMode)return;
   const file=traceImport.files?.[0];
   importedTrace=null;
   traceReplay.disabled=true;
@@ -887,6 +916,7 @@ traceImport.addEventListener("change",async()=>{
 });
 
 traceReplay.addEventListener("click",async()=>{
+  if(handFieldMode)return;
   if(!importedTrace||replayingTrace)return;
   if(cameraStarted){
     traceStatus.textContent="Stop the live camera before replaying a trace.";

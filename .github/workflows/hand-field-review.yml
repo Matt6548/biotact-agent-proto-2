@@ -1,0 +1,31 @@
+name: Hand CPU field UI isolated QA
+on:
+  pull_request:
+    branches: [integration/candle-v2-review-20261124]
+    paths:
+      - 'src/main.js'
+      - 'tests/hand-field/**'
+      - 'playwright.hand-field.config.js'
+      - '.github/workflows/hand-field-review.yml'
+permissions:
+  contents: read
+jobs:
+  field:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Verify normal app still builds
+        run: npm run build
+      - run: node scripts/prepare-hand-landmarker-assets.mjs
+      - name: Explicit isolated CPU Hand build
+        env:
+          VITE_CANDLE_HAND_FIELD: '1'
+        run: npx vite build --config tests/hand-field/vite.config.js
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test --config playwright.hand-field.config.js
