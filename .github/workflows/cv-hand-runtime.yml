@@ -39,6 +39,7 @@ jobs:
           echo "HAND_FIXTURE_PATH=$RUNNER_TEMP/hand-fixture.jpg" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npx vite build --config tests/hand-runtime/vite.config.js
+      - run: node scripts/prepare-legacy-qa-wasm.mjs .hand-runtime-dist
       - run: npx playwright test --config playwright.hand.config.js
       - uses: actions/upload-artifact@v4
         if: always()
