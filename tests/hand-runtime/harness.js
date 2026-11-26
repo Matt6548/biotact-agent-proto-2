@@ -1,4 +1,5 @@
 import {HandForwardAnalyzer} from '../../src/vision/hand-forward-analyzer.js';
+import {HandForwardAnalyzer as BaselineAnalyzer} from '../fixtures/hand-v2-baseline.js';
 import {FreePracticeEngine} from '../../src/features/free-practice.js';
 
 function request(worker,message,transfer=[]){
@@ -30,6 +31,7 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   worker.addEventListener('message',({data})=>{if(data.type==='egress-blocked')privacyAttempts.push({origin:data.origin,phase:data.phase});});
   const engine=new FreePracticeEngine({analyzer:new HandForwardAnalyzer({mirrorX:false})});
   engine.start();
+  const baseline=new BaselineAnalyzer({mirrorX:false});
   let clock=0;
   const rows=[];
   let finalDelegate=null;
@@ -38,8 +40,9 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
   try{
     const init=await request(worker,{type:'init',delegate});
     finalDelegate=init.delegate;
-    async function frame(label,scale,blank=false,wall=false){
-      if(wall&&lastCapture!==null)await new Promise(r=>setTimeout(r,Math.max(0,33-(performance.now()-lastCapture))));
+    async function frame(label,scale,blank=false,wall=false,period=33){
+      if(wall&&lastCapture!==null)await new Promise(r=>setTimeout(r,Math.max(0,period-(performance.now()-lastCapture))));
+      if(typeof scale==='function')scale=scale(performance.now());
       ctx.fillStyle='#202020';ctx.fillRect(0,0,640,480);
       if(!blank){
         const fit=Math.min(640/image.width,480/image.height)*scale;
@@ -61,6 +64,7 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
       finalDelegate=data.delegate??finalDelegate;
       const fps=wall?arrivals.length:30;
       const result=engine.onFrame({...data,fps});
+      const old=baseline.analyze({...data,fps});
       rows.push({
         label,clock:stamp,landmarkCount:data.hands?.[0]?.length??0,handCount:data.hands?.length??0,
         clockMode:wall?'wall':'simulated',captureDeltaMs,observedFps:wall?fps:null,
@@ -69,6 +73,9 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
         finite:(data.hands??[]).every(hand=>hand.every(p=>[p.x,p.y,p.z].every(Number.isFinite))),
         inferenceMs:data.inferenceMs,workerRoundTripMs:after-before,
         quality:result.analysis.quality.ok,preview:!!result.analysis.previewMotion,confirmed:!!result.strike,
+        baselinePreview:!!old.previewMotion,baselineConfirmed:!!old.strike,
+        reason:result.analysis.quality.reasons[0]??null,phase:result.analysis.metrics?.gesturePhase??null,
+        previewTilt:engine.previewTilt,
       });
       engine.tick(wall&&captureDeltaMs!==null?Math.min(.1,captureDeltaMs/1000):.033);
       if(!wall)clock+=33;
@@ -77,11 +84,27 @@ window.runHandRuntime=async({imageBase64,delegate})=>{
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('transformed-photo',scale);
     for(let i=0;i<8;i++)await frame('blank',1,true);
     // Independent phase using actual elapsed timestamps and measured result cadence.
-    engine.pause();engine.resume();
+    engine.pause();engine.resume();baseline.resetMotionState();
     wallBase=clock;wallEpoch=performance.now();lastCapture=null;arrivals=[];
     for(let i=0;i<20;i++)await frame('cadence-static',.72,false,true);
     for(const scale of [.72,.72,.78,.84,.91,.99,1.06,1.06,.99,.91,.84,.78,.72,.72])await frame('cadence-transformed-photo',scale,false,true);
     for(let i=0;i<5;i++)await frame('cadence-blank',1,true,true);
+    // Time-defined pulse: physical duration in the fixture does not stretch
+    // when inference gets slower. Target rates are caps, not achieved FPS.
+    if(delegate==='CPU')for(const target of [7,10,15]){
+      engine.pause();engine.resume();baseline.resetMotionState();arrivals=[];
+      const label='paced-'+target,period=1000/target;
+      const warm=performance.now();
+      while(performance.now()-warm<1300)await frame(label+'-static',.72,false,true,period);
+      const start=performance.now()+period;
+      const scale=now=>{
+        const u=(now-start)/820;
+        if(u<=0||u>=1)return .72;
+        return .72*Math.exp(Math.log(1.48)*(u<.42?u/.42:(1-u)/.58));
+      };
+      while(performance.now()-start<1300)await frame(label+'-motion',scale,false,true,period);
+      for(let i=0;i<3;i++)await frame(label+'-blank',1,true,true,period);
+    }
     // Exercise the SDK's periodic timer and close path, not just brief inference.
     const idleMs=delegate==='CPU'?65000:500;
     await new Promise(r=>setTimeout(r,idleMs));

@@ -21,8 +21,14 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --no-audit --no-fund
-      - run: npm test
+      - name: Unit tests with retained evidence
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p hand-runtime-evidence
+          npm test | tee hand-runtime-evidence/node-tests.log
       - name: Default app build (Pose path, no hand model in default dist)
+        id: default_build
         run: npm run build
       - run: node scripts/prepare-hand-landmarker-assets.mjs
       - name: Download public official sample for isolated model test
@@ -40,12 +46,13 @@ jobs:
           name: hand-runtime-numeric-evidence
           path: |
             hand-runtime-evidence/*.json
+            hand-runtime-evidence/node-tests.log
             public/models/hand_landmarker.provenance.txt
             public/mediapipe/hand-0.10.35/provenance.json
           if-no-files-found: warn
           retention-days: 7
       - name: Existing camera and resilience browser regression (serial, focus-sensitive)
-        if: always()
+        if: always() && steps.default_build.outcome == 'success'
         run: npx playwright test --workers=1 --project=camera-chromium --project=camera-mobile-chromium --project=resilience-chromium
       - uses: actions/upload-artifact@v4
         if: always()
