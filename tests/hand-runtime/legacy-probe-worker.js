@@ -11,9 +11,9 @@ self.onmessage=async({data})=>{
  let error=null;
  let frames=0;
  try{
-  const {HandLandmarker,FilesetResolver}=await import('@mediapipe/tasks-vision');
+  const {HandLandmarker,FilesetResolver}=await import('@mediapipe/legacy-qa');
   phase='legacy-load';
-  const files=await FilesetResolver.forVisionTasks(new URL('/mediapipe/wasm',self.location.origin).href,true);
+  const files=await FilesetResolver.forVisionTasks(new URL('/mediapipe/legacy-qa-wasm',self.location.origin).href,true);
   files.wasmLoaderPath+='?v=1.1.1';
   const response=await fetch('/models/hand_landmarker.task');
   if(!response.ok)throw new Error('Missing local model');
