@@ -13,12 +13,15 @@ window.auditPose=async({imageBase64,delegate})=>{
   worker.postMessage({type:'audit',bitmap,delegate},[bitmap]);
  });}finally{worker.terminate();}
 };
-window.localPose=async({imageBase64,delegate,durationMs=65000})=>{
+window.localPose=async({imageBase64,delegate,durationMs=65000,injectGpuFailure=false})=>{
  const source=await image(imageBase64);
- const worker=new Worker(new URL('../../src/vision/pose-worker.js',import.meta.url),{type:'module'});
+ const worker=injectGpuFailure
+  ?new Worker(new URL('./pose-fallback-probe-worker.js',import.meta.url),{type:'module'})
+  :new Worker(new URL('../../src/vision/pose-worker.js',import.meta.url),{type:'module'});
  const attempts=[],errors=[],samples=[];
- let pending=null;
+ let pending=null,injectedFailures=0;
  worker.onmessage=({data})=>{
+  if(data.type==='qa-injected-gpu-failure')injectedFailures++;
   if(data.type==='egress-blocked')attempts.push({origin:data.origin,phase:data.phase});
   if(['error','detect-error'].includes(data.type))errors.push(data.error);
   if(pending&&(pending.type===data.type||['egress-blocked','error','detect-error'].includes(data.type))){
@@ -52,7 +55,7 @@ window.localPose=async({imageBase64,delegate,durationMs=65000})=>{
  finally{worker.terminate();source.close();}
  samples.sort((a,b)=>a-b);
  const p=q=>samples.length?samples[Math.ceil(samples.length*q)-1]:null;
- return {requested:delegate,delegate:ready?.delegate??null,fallback:ready?.fallback??null,initMs:ready?.initMs??null,frames,detected,worldDetected,invalid,activeMs,closed,attempts,errors,error,medianMs:p(.5),p90Ms:p(.9)};
+ return {requested:delegate,injectedFailures,delegate:ready?.delegate??null,fallback:ready?.fallback??null,initMs:ready?.initMs??null,frames,detected,worldDetected,invalid,activeMs,closed,attempts,errors,error,medianMs:p(.5),p90Ms:p(.9)};
 };
 window.cameraLifecycle=async()=>{
  const video=document.createElement('video');video.muted=true;video.playsInline=true;document.body.append(video);

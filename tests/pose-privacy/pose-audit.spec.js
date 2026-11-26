@@ -1,4 +1,4 @@
-import {test,expect,chromium} from '@playwright/test';
+import {test,expect} from '@playwright/test';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 const origin='http://127.0.0.1:4190';
@@ -52,13 +52,13 @@ test('local Pose fake camera 66s active pause resume stop',async({page})=>{
  expect(result.live).toBe(true);expect(result.paused).toBe(true);expect(result.resumed).toBe(true);expect(result.stopped).toBe(true);
  expect(result.statuses).not.toContain('error');expect(result.statuses).not.toContain('privacy-block');expect(result.attempts).toEqual([]);expect(external).toEqual([]);
 });
-test('local Pose actual auto GPU unavailable fallback',async()=>{
- const browser=await chromium.launch({args:['--disable-webgl']});
- try{
-  const page=await browser.newPage();const external=await setup(page),f=fixture();
-  const result=await page.evaluate(args=>window.localPose(args),{imageBase64:f.imageBase64,delegate:'auto',durationMs:2000});
-  report('auto-no-webgl',{...result,external,scope:'Real initialization with WebGL disabled; auto must select CPU without allowing any external origin.'});
-  expect(result.delegate).toBe('CPU');expect(result.fallback).toBe('GPU initialization failed');expect(result.detected).toBeGreaterThan(0);
-  expect(result.closed).toBe(true);expect(result.error).toBeNull();expect(result.attempts).toEqual([]);expect(external).toEqual([]);
- }finally{await browser.close();}
+test('local Pose actual auto fallback after controlled GPU graph failure',async({page})=>{
+ const external=await setup(page),f=fixture();
+ const result=await page.evaluate(args=>window.localPose(args),{imageBase64:f.imageBase64,delegate:'auto',durationMs:2000,injectGpuFailure:true});
+ report('auto-injected-gpu-failure',{...result,external,scope:'QA-only injected failure after real GPU graph creation/close, followed by real product CPU graph initialization. Not physical GPU absence.'});
+ expect(result.injectedFailures).toBe(1);
+ expect(result.delegate).toBe('CPU');expect(result.fallback).toBe('GPU initialization failed');
+ expect(result.detected).toBeGreaterThan(0);expect(result.invalid).toBe(0);
+ expect(result.closed).toBe(true);expect(result.error).toBeNull();expect(result.errors).toEqual([]);
+ expect(result.attempts).toEqual([]);expect(external).toEqual([]);
 });

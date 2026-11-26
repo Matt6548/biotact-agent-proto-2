@@ -21,11 +21,13 @@ async function init(preferred){
   phase='create-'+delegate;
   const loader=new URL(vision.wasmLoaderPath,self.location.href);
   loader.searchParams.set('v','0.10.35');
+  const binary=new URL(vision.wasmBinaryPath,self.location.href);
+  binary.searchParams.set('v','0.10.35');
   // 0.10.35 consumes ModuleFactory; bounded distinct local module identity
   // is required if automatic GPU initialization fails and CPU is created.
   loader.searchParams.set('graph',String(++graphCreations));
   if(graphCreations>2)throw new Error('Pose graph creation limit exceeded');
-  return PoseLandmarker.createFromOptions({...vision,wasmLoaderPath:loader.href},{
+  return PoseLandmarker.createFromOptions({...vision,wasmLoaderPath:loader.href,wasmBinaryPath:binary.href},{
     baseOptions:{modelAssetBuffer:model,delegate},runningMode:'VIDEO',numPoses:1,
     minPoseDetectionConfidence:.55,minPosePresenceConfidence:.55,minTrackingConfidence:.55,
     outputSegmentationMasks:false,
