@@ -1,0 +1,37 @@
+name: Pose 1.1.1 isolated privacy audit
+on:
+  pull_request:
+    branches: [integration/candle-v2-review-20261124]
+    paths:
+      - 'tests/pose-privacy/**'
+      - 'playwright.pose-audit.config.js'
+      - '.github/workflows/pose-privacy-audit.yml'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run prepare:vision
+      - name: Verify pinned public Pose fixture (build-time only)
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --max-time 60 https://raw.githubusercontent.com/google-ai-edge/mediapipe-samples/b74eeb6d4952d97f244e03fefe4513637e59210f/examples/pose_landmarker/android/app/src/main/assets/sample_pose.jpg -o "$RUNNER_TEMP/pose-fixture.jpg"
+          test "$(git hash-object "$RUNNER_TEMP/pose-fixture.jpg")" = 69a5241ecb9d326ba7c71573f5b4fc14b12e9ca7
+          echo "POSE_FIXTURE_PATH=$RUNNER_TEMP/pose-fixture.jpg" >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium
+      - run: npx vite build --config tests/pose-privacy/vite.config.js
+      - run: npx playwright test --config playwright.pose-audit.config.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pose-privacy-numeric-evidence
+          path: pose-audit-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 7
