@@ -27,5 +27,18 @@ jobs:
         env:
           VITE_CANDLE_HAND_FIELD: '1'
         run: npx vite build --config tests/hand-field/vite.config.js
+      - name: Verify pinned public hand fixture (QA only)
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --max-time 60 https://storage.googleapis.com/mediapipe-tasks/gesture_recognizer/thumbs_up.jpg -o "$RUNNER_TEMP/hand-field-fixture.jpg"
+          echo "2aee0e3a69ba5f0d3287597e61d265f4f3ac2a44ccec198dddd2639b0c8ef7ba  $RUNNER_TEMP/hand-field-fixture.jpg" | sha256sum -c -
+          echo "HAND_FIELD_FIXTURE=$RUNNER_TEMP/hand-field-fixture.jpg" >> "$GITHUB_ENV"
       - run: npx playwright install --with-deps chromium
       - run: npx playwright test --config playwright.hand-field.config.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hand-field-chain-numeric-evidence
+          path: hand-field-evidence/*.json
+          if-no-files-found: warn
+          retention-days: 7
