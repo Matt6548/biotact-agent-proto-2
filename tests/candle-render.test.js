@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as THREE from "three";
 import { createWaxGeometry } from "../src/render/candle-geometry.js";
 import { CandleRenderer, createCandleCamera, approachVisual } from "../src/render/candle-renderer.js";
+import { TrackingRenderBudget } from "../src/render/tracking-render-budget.js";
 import {
   flameVertexShader, flameFragmentShader, glowFragmentShader,
   smokeVertexShader, smokeFragmentShader,
@@ -145,6 +146,7 @@ test("renderer read-only diagnostics are scoped and disposal frees each resource
   const materialB = { dispose: () => { counts.materialB += 1; } };
   const canvas = { width: 390, height: 620, candleRenderStats: () => ({}) };
   const candle = Object.create(CandleRenderer.prototype);
+  candle.trackingBudget = new TrackingRenderBudget();
   candle.renderer = {
     info: { render: { calls: 14, triangles: 3400 }, memory: { geometries: 13, textures: 0 } },
     domElement: canvas,
@@ -169,6 +171,9 @@ test("renderer read-only diagnostics are scoped and disposal frees each resource
   assert.equal(metrics.pixelRatio, 1.35);
   assert.equal(metrics.shadowMapEnabled, false);
   assert.equal(metrics.flameAlive, 1);
+  assert.equal(metrics.trackingBudget, "off");
+  candle.trackingBudget.setActive(true);
+  assert.equal(candle.getRenderMetrics().trackingBudget, "balanced");
   candle.dispose();
   assert.equal(canvas.candleRenderStats, undefined);
   assert.deepEqual(counts, {
