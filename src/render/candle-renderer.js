@@ -491,6 +491,7 @@ export class CandleRenderer {
       shadowMapEnabled: this.renderer.shadowMap.enabled,
       flameAlive: this.flameUniforms.uAlive.value,
       flameTilt: this.flameUniforms.uTilt?.value ?? 0,
+      targetTilt: this.state?.tilt ?? 0,
       smokeOpacity: this.smokeUniforms?.uOpacity.value ?? 0,
       emberHeat: this.emberHeat ?? 0,
       cameraFov: this.camera?.fov ?? 46,

@@ -222,3 +222,31 @@ test("fatal worker or privacy status fails closed and releases the camera", asyn
   assert.equal(controller.engine.state, "paused");
   assert.equal(stopped, 1);
 });
+
+test("fatal status reaches UI only after the partial visual cue and camera are cleared", async () => {
+  for (const state of ["error", "privacy-block"]) {
+    let options, stopped=0;
+    const observed=[], updates=[];
+    const engine=new FreePracticeEngine();
+    const controller=new FreePracticeCameraController({
+      video:{},engine,visibilityTarget:null,
+      onUpdate:update=>updates.push(update),
+      onStatus:status=>observed.push({status:status.state,snapshot:engine.snapshot(),stopped}),
+      trackerFactory:args=>{
+        options=args;
+        return {async start(){},stop(){stopped++;args.onStatus({state:"idle"});}};
+      },
+    });
+    await controller.start();
+    engine.previewTilt=.15;
+    options.onStatus({state});
+    assert.equal(observed.length,1);
+    assert.equal(observed[0].status,state);
+    assert.equal(observed[0].snapshot.state,"paused");
+    assert.equal(observed[0].snapshot.flame.tilt,0);
+    assert.equal(observed[0].stopped,1);
+    options.onResult(frame(0,0));
+    assert.equal(updates.length,0);
+    controller.dispose();
+  }
+});
