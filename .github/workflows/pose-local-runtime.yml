@@ -1,0 +1,84 @@
+name: Pose local runtime migration QA
+on:
+  pull_request:
+    branches: [integration/candle-v2-review-20261124, martial-training-lab]
+    paths:
+      - 'src/vision/**'
+      - 'scripts/**'
+      - 'package*.json'
+      - 'tests/pose-privacy/**'
+      - 'playwright.pose-audit.config.js'
+      - '.github/workflows/pose-local-runtime.yml'
+permissions:
+  contents: read
+jobs:
+  pose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [local, legacy, camera]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - name: Unit tests
+        if: matrix.suite == 'local'
+        run: npm test
+      - run: npm run build
+      - name: Verify launch assets and deployment configuration
+        run: |
+          npm run launch:check
+          node scripts/check-deployment-security.mjs
+          test ! -e dist/mediapipe/legacy-qa-wasm
+          test ! -e public/mediapipe/legacy-qa-wasm
+          node --input-type=module -e "import {verifyPoseWasm} from './scripts/pose-sdk-integrity.mjs'; console.log('dist WASM count',verifyPoseWasm('dist/mediapipe/wasm'))"
+          if grep -r -l -F 'odml.pa.googleapis.com' dist/assets; then exit 1; fi
+      - name: Portable server actual response and asset parity
+        if: matrix.suite == 'local'
+        shell: bash
+        run: |
+          python3 PORTABLE_SERVER.py --root dist --host 127.0.0.1 --port 4191 >/tmp/pose-portable.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS -D /tmp/pose-headers.txt -o /tmp/pose-loader.wasm http://127.0.0.1:4191/mediapipe/wasm/vision_wasm_module_internal.wasm; then break; fi
+            sleep .25
+          done
+          cmp /tmp/pose-loader.wasm dist/mediapipe/wasm/vision_wasm_module_internal.wasm
+          grep -qi '^Content-Security-Policy:.*connect-src .self.' /tmp/pose-headers.txt
+          grep -qi '^Cross-Origin-Opener-Policy: same-origin' /tmp/pose-headers.txt
+          grep -qi '^Cross-Origin-Embedder-Policy: require-corp' /tmp/pose-headers.txt
+          grep -qi '^Permissions-Policy: camera=(self)' /tmp/pose-headers.txt
+          echo 'Portable served pinned WASM and privacy headers'
+      - name: Verify official public Pose fixture
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --max-time 60 https://raw.githubusercontent.com/google-ai-edge/mediapipe-samples/b74eeb6d4952d97f244e03fefe4513637e59210f/examples/pose_landmarker/android/app/src/main/assets/sample_pose.jpg -o "$RUNNER_TEMP/pose-fixture.jpg"
+          test "$(git hash-object "$RUNNER_TEMP/pose-fixture.jpg")" = 69a5241ecb9d326ba7c71573f5b4fc14b12e9ca7
+          echo "POSE_FIXTURE_PATH=$RUNNER_TEMP/pose-fixture.jpg" >> "$GITHUB_ENV"
+      - run: npx playwright install --with-deps chromium
+      - run: npx vite build --config tests/pose-privacy/vite.config.js
+      - run: node scripts/prepare-legacy-qa-wasm.mjs .pose-audit-dist
+      - name: Actual product-worker CPU and GPU, 65 seconds each, auto fallback
+        if: matrix.suite == 'local'
+        run: npx playwright test --config playwright.pose-audit.config.js --grep 'local Pose actual'
+      - name: Legacy negative controls
+        if: matrix.suite == 'legacy'
+        run: npx playwright test --config playwright.pose-audit.config.js --grep 'legacy Pose'
+      - name: Long fake-camera lifecycle
+        if: matrix.suite == 'camera'
+        run: npx playwright test --config playwright.pose-audit.config.js --grep 'local Pose fake camera'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pose-local-${{ matrix.suite }}-numeric-evidence
+          path: |
+            pose-audit-evidence/*.json
+            public/mediapipe/wasm/provenance.json
+            public/models/pose_landmarker_lite.provenance.txt
+          if-no-files-found: warn
+          retention-days: 7

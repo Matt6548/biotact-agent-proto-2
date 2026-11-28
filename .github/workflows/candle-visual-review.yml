@@ -1,0 +1,45 @@
+name: OGON candle visual evidence
+
+on:
+  pull_request:
+    branches:
+      - integration/candle-free-practice-20261121
+      - integration/candle-v2-review-20261124
+    paths:
+      - 'src/render/**'
+      - 'tests/candle-render.test.js'
+      - 'tests/e2e/candle-visual.spec.js'
+      - '.github/workflows/candle-visual-review.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  visual-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout isolated PR
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Unit regression
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Capture 360/390/1366/1440, lifecycle screenshots and browser stats
+        run: npx playwright test --project=candle-visual-chromium
+      - name: Upload OGON screenshots, diagnostics and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ogon-visual-evidence
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 14

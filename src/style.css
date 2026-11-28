@@ -220,3 +220,213 @@ body.briefing-open{overflow:hidden}
   .lab[data-live="on"] .mission-strip,
   .lab[data-live="on"] .player-layer{display:none}
 }
+
+/* Candle Free Practice — single exercise, no game UI or onboarding gate. */
+.mission-strip,.player-layer,.round-summary,.round-insight,.session-review,.level-line{display:none!important}
+.lab{width:min(1120px,calc(100% - 34px));padding:24px 0 60px}
+.hero{display:flex;align-items:flex-start;gap:12px;flex-direction:column;padding:0 0 22px}
+.hero h1{font-size:clamp(2.4rem,4.4vw,4.4rem);line-height:1.04;letter-spacing:-.045em;font-weight:690}
+.stage-label{margin:0 0 10px;color:#d6b78c;font-size:.76rem;letter-spacing:.08em;text-transform:uppercase}
+.lede{margin:0;color:#b7b5ac;max-width:48ch;font-size:.91rem;line-height:1.5}
+.safety-inline{margin:0;color:#989b91;font-size:.73rem;line-height:1.45}
+.arena-status{display:flex;justify-content:space-between;align-items:center;gap:14px;border-top:1px solid #2f302c;border-bottom:0;margin:0 0 18px;padding:14px 0}
+.arena-status .practice-message{display:block;min-width:0}
+.arena-status .practice-message span{font-size:.71rem;color:#8e928a}
+.arena-status .practice-message strong{font-size:.9rem;white-space:normal;color:#ece6d5}
+.arena-status #primary-action{min-width:205px;min-height:50px;flex-shrink:0;box-shadow:0 3px 22px rgba(227,189,111,.11);transition:background .2s ease,transform .2s ease}
+.arena-status #primary-action:hover:not(:disabled){background:#fff1c6;transform:translateY(-1px)}
+.live-grid{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.75fr);gap:16px;align-items:start}
+.target-card{order:0;padding:12px;background:transparent;border:0;min-height:0}
+.camera-card{order:1;min-width:0;padding:12px;background:#151612}
+.target-head{padding:0 8px;margin-bottom:10px}
+.target-head h2{font-size:1rem;color:#e7dcc5}
+.scene{min-height:min(67svh,645px);border-color:#2d302a;background:radial-gradient(ellipse at 50% 35%,#24251d 0,#11130f 43%,#0d0e0c 75%);border-radius:22px}
+.target-overlay{bottom:16px;left:18px;right:18px}
+.target-overlay span{color:#dbccab}
+.target-overlay small{font-size:.69rem}
+.camera-head{gap:8px}
+.camera-head h2{font-size:.9rem}
+.camera-stage{aspect-ratio:4/3}
+.camera-note{font-size:.75rem}
+.practice-stats{margin:8px 0 0;border:1px solid #30322c;border-radius:14px;color:#aaa99f;overflow:hidden}
+.practice-stats>summary{cursor:pointer;min-height:44px;display:list-item;padding:12px 16px;font-size:.82rem}
+.practice-stats[open]{padding-bottom:12px}
+.practice-stats .strike-result,.practice-stats .coach-panel{margin:10px 14px 0}
+.practice-stats .coach-panel{padding-top:5px}
+.advanced-panel{margin-top:20px;border-top:1px solid #2a2d29;padding:4px 0;color:#969b90}
+.advanced-panel>summary{cursor:pointer;min-height:48px;padding:14px 4px;font-size:.83rem}
+.advanced-panel .history-card,.advanced-panel .simulation,.advanced-panel .field-test{margin-top:10px}
+.mini-target{display:none!important}
+.lab[data-live="on"] .hero,.lab[data-live="on"] .target-card,.lab[data-live="on"] .advanced-panel{display:block}
+.lab[data-live="on"] .live-grid{display:grid}
+.lab[data-live="on"] .arena-status{position:static}
+@media(max-width:900px){
+  .live-grid,.lab[data-live="on"] .live-grid{grid-template-columns:1fr;gap:12px}
+  .target-card{order:0}
+  .camera-card{order:1}
+  .scene{min-height:min(64svh,600px)}
+  .camera-stage{aspect-ratio:16/9}
+}
+@media(max-width:600px){
+  .lab,.lab[data-live="on"]{width:min(100% - 22px,1180px);padding:17px 0 48px}
+  .hero,.lab[data-live="on"] .hero{display:flex;padding:0 3px 14px;gap:10px}
+  .hero h1{font-size:clamp(2.05rem,9vw,3.5rem)}
+  .lede{font-size:.84rem;line-height:1.45}
+  .arena-status,.lab[data-live="on"] .arena-status{display:flex;position:static;margin:0 0 12px;padding:7px 0 12px;background:transparent;box-shadow:none;border-top:0}
+  .arena-status #primary-action{min-width:0;width:auto;max-width:210px;padding:0 15px;min-height:48px;font-size:.86rem}
+  .target-card,.lab[data-live="on"] .target-card{display:block;padding:0;border:0;border-radius:0;min-height:0}
+  .target-head{padding:0 4px}
+  .scene{min-height:min(56svh,490px);border-radius:18px}
+  .camera-card,.lab[data-live="on"] .camera-card{display:block;padding:10px;border-radius:16px}
+  .camera-stage,.lab[data-live="on"] .camera-stage{height:auto;max-height:none;min-height:0;aspect-ratio:16/9}
+  .lab[data-live="on"] .status-pill[data-state="ready"]{display:inline-block}
+  .lab[data-live="on"] .camera-head{min-height:0}
+  .lab[data-live="on"] .frame-guide{inset:8% 14%}
+  .lab[data-live="on"] .frame-guide span{display:none}
+  .target-overlay small{display:none}
+  .hit-feedback{bottom:54px;font-size:.76rem}
+  .practice-stats>summary{font-size:.8rem}
+}
+
+/* Keep the real camera and the full-size candle visible together in live practice.
+   This is the existing video element, not an extra stream or WebGL renderer. */
+@media(max-width:900px){
+  .lab[data-live="on"] .live-grid{position:relative}
+  .lab[data-live="on"] .camera-card{
+    position:absolute;
+    bottom:66px;
+    right:12px;
+    z-index:8;
+    width:min(40%,150px);
+    min-width:136px;
+    padding:7px;
+    border:1px solid #777163;
+    border-radius:14px;
+    background:rgba(20,21,17,.96);
+    box-shadow:0 12px 32px rgba(0,0,0,.55);
+  }
+  .lab[data-live="on"] .camera-head{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin-bottom:6px}
+  .lab[data-live="on"] .camera-head h2{font-size:.68rem}
+  .lab[data-live="on"] .status-pill{display:block;max-width:100%;padding:4px 6px;font-size:.61rem}
+  .lab[data-live="on"] .camera-stage{
+    width:100%;
+    height:auto;
+    min-height:0;
+    max-height:none;
+    aspect-ratio:4/3;
+    border-radius:9px;
+  }
+  .lab[data-live="on"] .setup-line{padding:5px 0 0;gap:0}
+  .lab[data-live="on"] .setup-line>div,
+  .lab[data-live="on"] .tracking-details,
+  .lab[data-live="on"] .camera-note{display:none}
+  .lab[data-live="on"] #stop-camera{
+    width:100%;
+    min-height:44px;
+    white-space:nowrap;
+    border-radius:9px;
+    border:1px solid #45483f;
+    color:#ebe5d6;
+    font-size:.75rem;
+  }
+}
+
+@media(max-width:600px){
+  .lab[data-live="on"] .hero{gap:4px;padding-bottom:8px}
+  .lab[data-live="on"] .hero h1{font-size:clamp(1.25rem,5vw,1.55rem);line-height:1.15}
+  .lab[data-live="on"] .hero .stage-label,
+  .lab[data-live="on"] .hero .lede{display:none}
+  .lab[data-live="on"] .hero .safety-inline{font-size:.67rem;line-height:1.35}
+  .lab[data-live="on"] .arena-status{margin-bottom:5px;padding-top:6px;padding-bottom:7px}
+  .lab[data-live="on"] .camera-card{right:9px;width:min(40%,150px)}
+}
+
+/* Immersive free practice: the candle is the stage; camera is a setup tool.
+   Keep the actual video visible in the document for local pose processing. */
+.live-grid,.lab[data-live="on"] .live-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:20px;
+  align-items:start;
+}
+.target-card,.lab[data-live="on"] .target-card{order:0}
+.camera-card,.lab[data-live="on"] .camera-card{
+  order:1;
+  width:min(100%,550px);
+  margin:0 auto;
+  padding:14px;
+}
+.target-actions{display:flex;gap:22px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.target-actions .text-button{white-space:nowrap}
+.camera-head .back-to-candle{margin-left:auto;white-space:nowrap;font-size:.78rem;color:#e4d4ac}
+.scene{
+  min-height:min(76svh,770px);
+  background:radial-gradient(ellipse at 50% 40%,#28251e 0%,#171714 42%,#0b0c0a 85%);
+  box-shadow:inset 0 0 90px rgba(0,0,0,.19);
+}
+.camera-stage{aspect-ratio:16/9}
+@media(max-width:900px){
+  .lab[data-live="on"] .live-grid{position:static}
+  .lab[data-live="on"] .camera-card{
+    position:relative;
+    bottom:auto;
+    right:auto;
+    z-index:auto;
+    width:min(100%,550px);
+    min-width:0;
+    margin:0 auto;
+    border:1px solid #30322c;
+    background:#151612;
+    box-shadow:none;
+  }
+  .lab[data-live="on"] .camera-head{flex-direction:row;align-items:center;gap:12px;margin-bottom:12px}
+  .lab[data-live="on"] .camera-head h2{font-size:.9rem}
+  .lab[data-live="on"] .status-pill{max-width:38%}
+  .lab[data-live="on"] .camera-stage{aspect-ratio:16/9}
+  .lab[data-live="on"] .setup-line{padding:12px 2px 4px;gap:12px}
+  .lab[data-live="on"] .setup-line>div,
+  .lab[data-live="on"] .tracking-details,
+  .lab[data-live="on"] .camera-note{display:block}
+  .lab[data-live="on"] #stop-camera{
+    width:auto;
+    min-width:108px;
+    min-height:44px;
+    padding:4px 12px;
+  }
+}
+@media(max-width:600px){
+  .scene{min-height:min(70svh,610px)}
+  .target-head{gap:8px}
+  .target-actions{gap:10px}
+  .target-actions .text-button{font-size:.77rem}
+  .lab[data-live="on"] .camera-card{right:auto;width:100%;padding:12px}
+  .lab[data-live="on"] .camera-head{gap:8px;flex-wrap:wrap}
+  .lab[data-live="on"] .camera-head h2{font-size:.85rem}
+  .lab[data-live="on"] .status-pill{font-size:.67rem;min-width:0;max-width:36%}
+  .lab[data-live="on"] .back-to-candle{font-size:.72rem}
+  .lab[data-live="on"] .frame-guide span{display:block}
+}
+
+/* Desktop Hand field: the object is the focus, not the page title.
+   Reserve the entire candle stage within short laptop browser viewports.
+   Existing mobile and normal Pose routes are untouched. */
+@media (min-width:901px) and (min-height:500px){
+  .lab[data-tracking-mode="hand-field"]{padding-top:10px}
+  .lab[data-tracking-mode="hand-field"] .hero{
+    display:grid;grid-template-columns:minmax(200px,.8fr) minmax(0,1.2fr);
+    align-items:center;gap:2px 24px;padding:0 4px 8px;
+  }
+  .lab[data-tracking-mode="hand-field"] .hero>div{grid-row:1/3}
+  .lab[data-tracking-mode="hand-field"] .hero h1{font-size:clamp(1.65rem,2.6vw,2.25rem);line-height:1.1}
+  .lab[data-tracking-mode="hand-field"] .stage-label{font-size:.67rem;margin:0 0 4px}
+  .lab[data-tracking-mode="hand-field"] .lede{max-width:65ch;font-size:.82rem;line-height:1.35}
+  .lab[data-tracking-mode="hand-field"] .safety-inline{font-size:.7rem;line-height:1.3}
+  .lab[data-tracking-mode="hand-field"] .arena-status{padding:6px 4px;margin:0 0 4px}
+  .lab[data-tracking-mode="hand-field"] .arena-status #primary-action{min-height:44px;min-width:190px}
+  .lab[data-tracking-mode="hand-field"] .target-card{padding:4px 0 0}
+  .lab[data-tracking-mode="hand-field"] .target-head{margin-bottom:6px;padding:0 8px;min-height:36px}
+  .lab[data-tracking-mode="hand-field"] .target-actions .text-button{min-height:36px}
+  .lab[data-tracking-mode="hand-field"] .scene{
+    min-height:0;height:clamp(270px,calc(100svh - 200px),700px);
+  }
+}

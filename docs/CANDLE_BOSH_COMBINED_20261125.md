@@ -1,0 +1,11 @@
+# BOSH — combined V3 review, 25 November 2026
+
+Baseline be1b5e301211bcc0f6cb9b6a450327c9be9b6fea (PR #9): full CI 45377372458, 125/125 Node, 13 Playwright passed / 2 skips, build and security PASS.
+CV source ac0af632cf6857a0e54b0f8f3b579dd356281ef1 (PR #10): full isolated CI 45379817292, 137/137 Node, 3/3 hand runtime tests (including legacy deny-only negative control), existing Pose/browser regression 6 pass / 1 skip. All job steps independently confirmed from logs.
+24 CV files were checked against common checkpoint f535407e3e3b3da2555670b99b00fbd345795cc4; no path conflict with OGON V3. Port 23 exact file blobs and one CI workflow with additional base branch trigger for the combined PR. No UI change, no production deploy, no hand assets in default build.
+
+Privacy: old SDK 1.1.1 Hand close reproduces attempted ODML telemetry, blocked before transport. Separate pinned Hand alias 0.10.35, local WASM and model, strict egress latch, same-origin policy retained. New Hand tests report zero attempts/traffic through 65s idle and close, including one GPU-to-CPU switch. Evidence: CI artifact 14912424540 (specialist report); raw CI success verified independently. This does not prove all possible network paths or establish Pose 1.1.1 safety.
+Performance: specialist artifact reports CPU-only median 74.455ms / p90 101.125ms inference; auto GPU initial median 1197.30ms then CPU median 98.775ms on cloud headless. Actual public-photo inference wall cadence around 10 FPS; early preview appeared, no confirmed movement at wall-clock cadence. Not a human-camera benchmark or end-to-end display latency.
+
+Release HOLD: combined CI (main app and isolated hand runtime) must complete; audit Pose 1.1.1 long inference and shutdown for telemetry attempts, preserve deny-only policies; investigate low-cadence confirmation without admitting static/wave false positives. Hand remains absent from normal UI. CPU-first is the candidate for a future explicit field-only mode, not a product release. Verify real desktop/Redmi FPS, latency, heat, privacy and actual gestures. Do not promote production.
+Keep one candle and free practice; no levels, registration or extra camera. Existing V2 Preview untouched.

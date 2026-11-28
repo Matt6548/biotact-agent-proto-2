@@ -1,0 +1,7 @@
+# BOSH V3.1 — integration acceptance, 28 November 2026
+
+Baseline e565418c20fc6c7f4e1279f498446eebba766399; accepted source PR #16 exact 73a26d9deb4839f4b70d16a012dae60475482150. Direct descendant, 12 reviewed paths, no conflicting branch changes. Both exact-source CI runs completed SUCCESS (46126611555 Hand field, 46126611621 OGON): 148/148 unit tests, normal/field builds, two Hand browser tests, two visual browser tests.
+
+Actual Hand CPU with public transformed-image canvas stream and product renderer: 65.029s stationary with 0 confirmed events; three pulses (820/1000/1250ms) each confirmed once; 786 worker results, 762 single hands, median result gap 98.23ms (~10.18 result FPS), zero worker egress attempts/errors and external browser requests, stop releases stream. Balanced tier 299536 drawing-buffer pixels throughout. No proof of switching tiers in this browser run; switching covered by four unit tests. Compared with earlier failed chain 96 results in about 25s (~4 FPS); not a controlled hardware benchmark. Gesture thresholds unchanged. No physical camera or measured display latency. Do not infer real accuracy from 3 transformed-photo cases.
+
+Accept into PR #9 for combined CI, preserve previous deployed V3 Preview. New field-only Preview after integrated gate pass; do not modify production or promote. Real desktop and Redmi testing required. MIT attribution and full license retained, no new dependency.
