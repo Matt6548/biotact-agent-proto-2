@@ -93,15 +93,42 @@ test('actual Hand model + camera stream + existing candle UI, long stationary an
    report.pulses=[];
    for(const duration of [820,1000,1250]){
      const before=await count();
-     await page.evaluate(duration=>{const q=window.__fieldQA;q.mode='motion';q.pulseDuration=duration;q.pulseStart=performance.now()+200;},duration);
-     await page.waitForTimeout(duration+1250);
-     await page.evaluate(()=>{window.__fieldQA.mode='stationary';});
+     const visual=await page.evaluate(({duration,before})=>new Promise(resolve=>{
+       const q=window.__fieldQA;
+       const canvas=document.querySelector('#target-canvas canvas');
+       const baseline=canvas?.candleRenderStats?.();
+       const neutral=Boolean(baseline&&Math.abs(baseline.flameTilt)<.008&&Math.abs(baseline.targetTilt)<.008);
+       q.mode='motion';q.pulseDuration=duration;q.pulseStart=performance.now()+200;
+       const evidence={neutral,firstTargetMs:null,firstShaderMs:null,confirmedMs:null,peakEarlyShaderTilt:0};
+       let raf;
+       const sample=()=>{
+         const m=canvas?.candleRenderStats?.(),elapsed=performance.now()-q.pulseStart;
+         const count=Number(document.querySelector('#round-count').textContent)||0;
+         if(elapsed>=0&&m){
+           if(count>before&&evidence.confirmedMs===null)evidence.confirmedMs=elapsed;
+           if(neutral&&count===before){
+             if(Math.abs(m.targetTilt)>=.012&&evidence.firstTargetMs===null)evidence.firstTargetMs=elapsed;
+             if(Math.abs(m.flameTilt)>=.012&&evidence.firstShaderMs===null)evidence.firstShaderMs=elapsed;
+             evidence.peakEarlyShaderTilt=Math.max(evidence.peakEarlyShaderTilt,Math.abs(m.flameTilt));
+           }
+         }
+         raf=requestAnimationFrame(sample);
+       };
+       raf=requestAnimationFrame(sample);
+       setTimeout(()=>{cancelAnimationFrame(raf);q.mode='stationary';resolve(evidence);},duration+1450);
+     }),{duration,before});
      const delta=(await count())-before;
-     report.pulses.push({durationMs:duration,confirmed:delta,score:await page.locator('#score').textContent(),lastMotion:await page.locator('#last-strike').textContent(),flameStatus:await page.locator('#flame-state').textContent()});
+     report.pulses.push({durationMs:duration,confirmed:delta,visual,score:await page.locator('#score').textContent(),lastMotion:await page.locator('#last-strike').textContent(),flameStatus:await page.locator('#flame-state').textContent()});
      expect(delta).toBeLessThanOrEqual(1);
    }
    report.confirmed=report.pulses.reduce((n,p)=>n+p.confirmed,0);
    expect(report.confirmed,'at least one observed camera-to-UI response required').toBeGreaterThan(0);
+   // A rendered shader uniform must move BEFORE any confirmed event from a
+   // neutral baseline. This is software-side evidence, not optical latency.
+   expect(report.pulses.some(p=>p.confirmed===1&&p.visual.neutral&&
+     p.visual.firstShaderMs!==null&&p.visual.confirmedMs!==null&&
+     p.visual.firstShaderMs<p.visual.confirmedMs),
+     'early visual response precedes confirmed motion').toBe(true);
    await expect(page.locator('#last-strike')).toContainText('Приближение кисти');
    await expect(page.locator('#score')).toHaveText(/^[0-9]+\.[0-9]+$/);
    const beforeBlank=await count();

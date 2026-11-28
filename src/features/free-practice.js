@@ -191,8 +191,10 @@ export class FreePracticeCameraController {
       },
       onStatus: (status) => {
         if (generation === this.generation) {
-          this.onStatus?.(status);
+          // Release the camera and clear the partial gesture before the UI
+          // reads the paused state. Late status from stop() is generation-gated.
           if (status?.state === "error" || status?.state === "privacy-block") this.pause();
+          this.onStatus?.(status);
         }
       },
     });

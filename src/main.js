@@ -560,8 +560,11 @@ function finishCalibration(){
 
 // The live UI uses the continuous CV engine. Old round/calibration functions
 // remain isolated for the opt-in engineering demo and trace replay.
-function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCount}){
+function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCount,flame,ignored}){
   if(!frame)return;
+  // The early bounded cue is already computed by the engine. Deliver it now,
+  // without waiting for the next 50ms decay tick. No extra render or inference.
+  if(handFieldMode&&!ignored&&flame)candleRenderer.setState(flame);
   if(frame.diagnostics){
     if(frame.diagnostics.delegate)modelBackendEl.textContent=frame.diagnostics.delegate;
     inferenceEl.textContent=Number.isFinite(frame.diagnostics.inferenceMs)?`${Math.round(frame.diagnostics.inferenceMs)} ms`:"—";
@@ -615,7 +618,7 @@ function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCoun
   }
   if(strike&&response){
     const hand=strike.hand==="left"?"Левая":"Правая";
-    candleRenderer.setState(response.flame);
+    if(!handFieldMode)candleRenderer.setState(response.flame);
     candleRenderer.triggerImpulse(response.visualImpulse);
     flameState.textContent=response.flame.extinguished?"Пламя погасло":response.flame.instability>.65?"Пламя колеблется":"Пламя движется";
     score.textContent=response.visualImpulse.toFixed(2);
@@ -742,6 +745,7 @@ function startRound({simulation=false}={}){
 function showPausedCamera(){
   stopPracticeTick();
   trainingPaused=true;
+  if(handFieldMode)candleRenderer.setState(freePractice.snapshot().flame);
   syncRendererMode();
   cameraCard.dataset.camera="off";
   cameraCard.dataset.pose="off";
