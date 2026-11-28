@@ -265,6 +265,7 @@ function syncRendererMode(){
     miniCandleRenderer.dispose();
     miniCandleRenderer=null;
   }
+  candleRenderer.setTrackingBudget?.(handFieldMode&&cameraStarted&&!trainingPaused&&!document.hidden);
   candleRenderer.setActive(!document.hidden);
   cameraCard.dataset.rendererMode=document.hidden?"paused":"full";
 }
@@ -587,10 +588,15 @@ function updateFreePracticeLive({frame,analysis,strike,response,state,strikeCoun
     fpsEl.textContent=Number.isFinite(frame.fps)?String(Math.round(frame.fps)):"—";
     leftSpeedEl.textContent="—";
     rightSpeedEl.textContent="—";
+    candleRenderer.sampleTrackingBudget?.(frame.fps,performance.now());
     const ready=Boolean(analysis?.quality?.ok);
+    const reason=analysis?.quality?.reasons?.[0]??"";
+    cameraCard.dataset.trackingReason=reason;
     cameraCard.dataset.pose=ready?"ready":"adjust";
     qualityEl.textContent=ready?"Кисть в кадре":"Нет уверенного отслеживания";
-    setupState.textContent=ready?"Всё готово · двигайся свободно":"Покажи одну кисть целиком";
+    setupState.textContent=ready?"Всё готово · двигайся свободно":
+      reason==="low-tracking-fps"||reason==="tracking-gap"?"Низкая скорость распознавания · снижаем нагрузку":
+      reason==="ambiguous-hands"?"Оставь одну кисть в кадре":"Покажи одну кисть целиком";
   }else{
     drawPose(frame.landmarks);
     if(!analysis?.metrics){
@@ -736,6 +742,7 @@ function startRound({simulation=false}={}){
 function showPausedCamera(){
   stopPracticeTick();
   trainingPaused=true;
+  syncRendererMode();
   cameraCard.dataset.camera="off";
   cameraCard.dataset.pose="off";
   cameraStatus.dataset.state="idle";
@@ -754,6 +761,7 @@ primaryAction.addEventListener("click",async()=>{
     poseReady=false;
     await freePractice.resume();
     trainingPaused=false;
+    syncRendererMode();
     cameraCard.dataset.camera="on";
     cameraCard.dataset.pose="loading";
     cameraEmpty.hidden=true;
