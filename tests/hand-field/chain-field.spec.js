@@ -25,12 +25,15 @@ test('actual Hand model + camera stream + existing candle UI, long stationary an
            stats.results++;
            if(data.hands.length===1&&data.hands[0]?.length===21)stats.detected++;
            const t=performance.now();
+           // Observe after the application has handled this same worker result.
+           queueMicrotask(()=>{
            const camera=document.querySelector('#camera-card');
            const canvas=document.querySelector('#target-canvas canvas');
            const metrics=canvas?.candleRenderStats?.();
            stats.samples.push({t,ms:data.inferenceMs,count:data.hands.length,reason:camera?.dataset.trackingReason??null,
              budget:metrics?.trackingBudget??null,renderPixels:metrics?metrics.canvasWidth*metrics.canvasHeight:null});
            if(stats.samples.length>4000)stats.samples.shift();
+           });
          }else if(data.type==='egress-blocked')stats.attempts.push({origin:data.origin,phase:data.phase});
          else if(['error','detect-error'].includes(data.type))stats.workerErrors.push(data.type);
        });
