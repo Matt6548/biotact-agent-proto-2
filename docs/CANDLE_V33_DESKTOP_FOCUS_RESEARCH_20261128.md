@@ -1,0 +1,11 @@
+# BOSH — V3.3 desktop focus and hardware research
+
+Baseline 90738107b7474fd1a9f08502908b831e6c71d496. Owner supplied two private 1366x768 screenshots of V3.1 Preview. Do not commit or export those images. First shows Hand model ready CPU but low tracking speed warning; actual FPS/inference not shown. Second shows paused camera and candle scene below oversized header, partly below visible browser area. No claim of motion latency or exact hardware from screenshots.
+
+Scoped change: Hand-only desktop CSS compacts heading/control band and bounds scene to viewport, retaining safety notice, camera settings below, existing start/stop/privacy, single canvas, default Pose and mobile behavior. Tests on 1366x625 (approximate visible browser area), 1440x900, 1024x600, navigation with camera still off. Whole stage visible is not proof of photorealism; separate OGON geometry/framing work required.
+
+V3.2 PR #17 HEAD 59c518e67d41e3fef041a3b50fc1ecd8f8ec7c76: CV and visual CI PASS, field CI 46132613102 FAIL (149 units passed, 454 results/454 detected, median gap 163.485 ms, 221 low-tracking-fps and 8 tracking-gap rejections, 0/3 pulses, zero external attempts/requests, no JS errors). Hold merge, do not relax tests.
+
+Research: Sonified/webgpu-vision exact 672367e2e7210cbb8bf3d2e0bf85c5f263e11dd1, MIT code and separate Apache-2.0 models/LICENSE checked. README documents custom WGSL engine and alternative ONNX Runtime Web path; reported ~5 ms vs ~20 ms on M1 Max, Chrome 148, 640x480; not our result. Audit pinned dependencies/model provenance/notice/egress, GPU compatibility, CPU fallback, coordinate convention and two-hand rejection before adapting. No code imported yet. Compare lower camera resolution (same aspect), CPU/GPU/AUTO and optional WebGPU backend in isolated bench; keep 7 FPS and timestamp guards. Current production and V3.1 Preview unchanged.
+
+OGON: evaluate gddickinson/candle_flame (MIT, browser particle simulation) and LucaAngioloni/SmokeGL (MIT), both verified repo licenses, compare wick contact, wax translucency, flame volume and lighting, avoid computationally excessive fluid solver. Three.js WebGPURenderer does not directly support existing ShaderMaterial/RawShaderMaterial, so no global rewrite. Maintain one candle, no levels or forced setup. No real fire exercise.
