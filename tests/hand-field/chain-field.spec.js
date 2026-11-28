@@ -25,7 +25,11 @@ test('actual Hand model + camera stream + existing candle UI, long stationary an
            stats.results++;
            if(data.hands.length===1&&data.hands[0]?.length===21)stats.detected++;
            const t=performance.now();
-           stats.samples.push({t,ms:data.inferenceMs,count:data.hands.length});
+           const camera=document.querySelector('#camera-card');
+           const canvas=document.querySelector('#target-canvas canvas');
+           const metrics=canvas?.candleRenderStats?.();
+           stats.samples.push({t,ms:data.inferenceMs,count:data.hands.length,reason:camera?.dataset.trackingReason??null,
+             budget:metrics?.trackingBudget??null,renderPixels:metrics?metrics.canvasWidth*metrics.canvasHeight:null});
            if(stats.samples.length>4000)stats.samples.shift();
          }else if(data.type==='egress-blocked')stats.attempts.push({origin:data.origin,phase:data.phase});
          else if(['error','detect-error'].includes(data.type))stats.workerErrors.push(data.type);
@@ -118,7 +122,12 @@ test('actual Hand model + camera stream + existing candle UI, long stationary an
    report={...report,stats,external,errors};
    fs.mkdirSync('hand-field-evidence',{recursive:true});
    fs.writeFileSync('hand-field-evidence/chain.json',JSON.stringify(report,null,2));
-   const {samples,...summary}=stats??{};
+   const {samples=[],...summary}=stats??{};
+   const gaps=samples.slice(1).map((s,i)=>s.t-samples[i].t).sort((a,b)=>a-b);
+   report.observed={medianGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
+     reasons:samples.reduce((acc,s)=>(acc[s.reason??"none"]=(acc[s.reason??"none"]??0)+1,acc),{}),
+     budgets:[...new Set(samples.map(s=>s.budget))],pixels:[...new Set(samples.map(s=>s.renderPixels))]};
+   fs.writeFileSync('hand-field-evidence/chain.json',JSON.stringify(report,null,2));
    console.log('HAND_FIELD_CHAIN '+JSON.stringify({...report,stats:summary}));
  }
 });

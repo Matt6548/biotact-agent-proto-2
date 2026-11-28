@@ -33,3 +33,8 @@ MediaPipe documentation current in 2026 states that task input data is processed
 4. sets production CSP `connect-src 'self'`.
 
 See `docs/STAGE11_PRIVATE_RUNTIME.md`.
+
+## Adaptive tracking render budget
+- Upstream: https://github.com/damiansire/web-ar-hand-tracking/blob/af0cbcf94dbcf8e07b6da593d3ff04a7459f2c58/src/domain/perf-governor.ts
+- Copyright (c) 2026 Damián Sire, MIT. Full notice: `licenses/web-ar-hand-tracking-MIT.txt`.
+- Adapted tier/hysteresis concept to actual hand-result cadence, elapsed-time thresholds, resolution and frame caps; no new dependency or upstream application imported.

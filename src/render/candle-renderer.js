@@ -6,6 +6,8 @@ import {
   smokeVertexShader, smokeFragmentShader,
 } from "./candle-shaders.js";
 
+import { TrackingRenderBudget, budgetPixelRatio } from "./tracking-render-budget.js";
+
 const clamp = THREE.MathUtils.clamp;
 const CANDLE_FOCUS = [0, 0.74, 0];
 // Exponential approach in seconds, not in frames. No inference of real air speed.
@@ -31,6 +33,8 @@ export class CandleRenderer {
     this.active = false;
     this.raf = null;
     this.pixelRatioCap = pixelRatio;
+    this.trackingBudget = new TrackingRenderBudget();
+    this.lastRenderAt = -Infinity;
     this.interactive = interactive;
     this.state = { tilt: 0, instability: 0, stability: 1, extinguished: false };
     this.wasExtinguished = false;
@@ -387,7 +391,10 @@ export class CandleRenderer {
   resize() {
     const width = Math.max(1, this.container.clientWidth);
     const height = Math.max(1, this.container.clientHeight);
-    const ratio = Math.min(window.devicePixelRatio || 1, this.pixelRatioCap, width <= 420 ? 1.35 : 2);
+    const nativeRatio = Math.min(window.devicePixelRatio || 1, this.pixelRatioCap, width <= 420 ? 1.35 : 2);
+    const ratio = this.trackingBudget.active
+      ? budgetPixelRatio(width,height,nativeRatio,this.trackingBudget.tier.maxPixels)
+      : nativeRatio;
     this.renderer.setPixelRatio(ratio);
     this.smokeUniforms.uPixelRatio.value = ratio;
     this.camera.aspect = width / height;
@@ -395,11 +402,23 @@ export class CandleRenderer {
     this.renderer.setSize(width, height, false);
   }
 
+  setTrackingBudget(active) {
+    if (!this.trackingBudget.setActive(active)) return;
+    this.lastRenderAt = -Infinity;
+    this.resize();
+    if (!this.active) this.renderOnce();
+  }
+
+  sampleTrackingBudget(fps, now) {
+    if (this.trackingBudget.sample(fps, now)) this.resize();
+  }
+
   setActive(active) {
     const next = Boolean(active);
     if (next === this.active) return;
     this.active = next;
     if (next) {
+      this.lastRenderAt = -Infinity;
       this.clock.start();
       this.animate();
     } else {
@@ -421,6 +440,9 @@ export class CandleRenderer {
       return;
     }
     this.raf = requestAnimationFrame(this.animate);
+    const now = performance.now();
+    if (this.trackingBudget.active && now-this.lastRenderAt < 1000/this.trackingBudget.tier.renderFps-1) return;
+    this.lastRenderAt = now;
     const dt = Math.min(this.clock.getDelta(), 0.1);
     this.visualTime += dt;
     const elapsed = this.visualTime;
@@ -465,6 +487,7 @@ export class CandleRenderer {
       canvasWidth: this.renderer.domElement.width,
       canvasHeight: this.renderer.domElement.height,
       pixelRatio: this.renderer.getPixelRatio(),
+      trackingBudget: this.trackingBudget.active ? this.trackingBudget.tier.name : "off",
       shadowMapEnabled: this.renderer.shadowMap.enabled,
       flameAlive: this.flameUniforms.uAlive.value,
       flameTilt: this.flameUniforms.uTilt?.value ?? 0,
